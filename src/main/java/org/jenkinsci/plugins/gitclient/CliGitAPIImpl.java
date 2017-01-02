@@ -700,6 +700,57 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
     }
 
     /**
+     * clean_.
+     *
+     * @return a {@link org.jenkinsci.plugins.gitclient.CleanCommand} object.
+     */
+    public CleanCommand clean_() {
+        return new CleanCommand() {
+            private List<String> excludePatterns = Collections.emptyList();
+            private boolean removeSubmodules = false;
+            private Integer timeout = TIMEOUT;
+        	           
+            public CleanCommand excludePatterns(List<String> excludePatterns) {
+                this.excludePatterns = excludePatterns;
+                return this;
+            }
+
+            @Override
+            public CleanCommand submodules(boolean removeSubmodules) {
+                this.removeSubmodules = false;
+                return this;
+            }
+
+			public CleanCommand timeout(Integer timeout) {
+                this.timeout = timeout;
+                return this;
+            }
+            
+            public void execute() throws GitException, InterruptedException {
+                reset(true);
+                ArgumentListBuilder args = new ArgumentListBuilder();
+                args.add("clean");
+                if (removeSubmodules) {
+                    args.add("-ffdx");
+                }
+                else {
+                    args.add("-fdx");
+                }
+                if (excludePatterns != null) {
+                    for (String pattern : excludePatterns) {
+                        if ( !Strings.isNullOrEmpty(pattern) ) {
+                            args.add("-e");
+                            args.add(pattern);
+                        }
+                    }
+                }
+                String result = launchCommandIn(args, workspace, environment, timeout);
+                listener.getLogger().println(result);
+            }
+        };
+    }
+    
+    /**
      * Remove untracked files and directories, including files listed
      * in the ignore rules.
      *
