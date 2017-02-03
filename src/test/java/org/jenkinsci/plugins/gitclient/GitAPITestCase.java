@@ -832,6 +832,10 @@ public abstract class GitAPITestCase extends TestCase {
         w.touch(fileName2);
         w.touch(fileName, "new content");
 
+        // JGit does not support exclude patterns
+        w.cgit().clean_().excludePatterns(Collections.singletonList(fileName)).execute();
+        assertTrue(w.exists(fileName));
+        
         w.git.clean();
         assertFalse(w.exists(dirName1));
         assertFalse(w.exists(fileName1));
