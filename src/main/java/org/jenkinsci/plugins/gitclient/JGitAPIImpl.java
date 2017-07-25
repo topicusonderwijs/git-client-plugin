@@ -1252,6 +1252,10 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
         }
     }
 
+    public CleanCommand clean_() {
+        throw new UnsupportedOperationException("No JGit support!");
+    }
+    
     /**
      * clean.
      *

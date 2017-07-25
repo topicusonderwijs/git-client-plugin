@@ -435,6 +435,12 @@ public interface GitClient {
      */
     void clean() throws GitException, InterruptedException;
 
+    /**
+     * clean_.
+     *
+     * @return a {@link org.jenkinsci.plugins.gitclient.CleanCommand} object.
+     */
+    CleanCommand clean_(); // can't use 'clean' as legacy IGitAPI already define this method
 
 
     // --- manage branches
