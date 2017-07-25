@@ -11,6 +11,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.Launcher;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.Launcher.LocalLauncher;
