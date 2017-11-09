@@ -88,6 +88,33 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
     public static final boolean USE_SETSID = Boolean.valueOf(System.getProperty(CliGitAPIImpl.class.getName() + ".useSETSID", "false"));
 
     /**
+     * Set promptForAuthentication=true if you must allow command line git
+     * versions 2.3 and later to prompt the user for authentication.
+     *
+     * Command line git prompting for authentication should be rare, since
+     * Jenkins credentials should be managed through the credentials plugin.
+     *
+     * Command line git 2.3 and later read the environment variable
+     * GIT_TERMINAL_PROMPT. If it has the value 0, then git will not prompt the
+     * user for authentication, even if a terminal is available (as when running
+     * a Jenkins agent from the Windows desktop, or when running it
+     * interactively from the command line, or from a Docker image). If a
+     * terminal is not available (most services on Windows and Linux), then
+     * command line git will not prompt for authentication, whether or not
+     * GIT_TERMINAL_PROMPT is set.
+     *
+     * GCM_INTERACTIVE=never is the environment variable which should
+     * cause the git credential manager for windows to never prompt
+     * for credentials.
+     *
+     * Credential prompting could happen on multiple platforms, but is
+     * more common on Windows computers because many Windows agents
+     * run from the desktop environment.  Agents running on the
+     * desktop are much less common in the Unix environments.
+     */
+    private static final boolean PROMPT_FOR_AUTHENTICATION = Boolean.valueOf(System.getProperty(CliGitAPIImpl.class.getName() + ".promptForAuthentication", "false"));
+
+    /**
      * CALL_SETSID decides if command line git can use the setsid program
      * during ssh based authentication to detach git from its controlling
      * terminal.
@@ -113,6 +140,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
     EnvVars environment;
     private Map<String, StandardCredentials> credentials = new HashMap<>();
     private StandardCredentials defaultCredentials;
+    private StandardCredentials lfsCredentials;
 
     private void warnIfWindowsTemporaryDirNameHasSpaces() {
         if (!isWindows()) {
@@ -538,8 +566,10 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                         else {
                             File alternates = new File(workspace, ".git/objects/info/alternates");
                             try (PrintWriter w = new PrintWriter(alternates, Charset.defaultCharset().toString())) {
+                                String absoluteReference = objectsPath.getAbsolutePath().replace('\\', '/');
+                                listener.getLogger().println("Using reference repository: " + reference);
                                 // git implementations on windows also use
-                                w.print(objectsPath.getAbsolutePath().replace('\\', '/'));
+                                w.print(absoluteReference);
                             } catch (UnsupportedEncodingException ex) {
                                 listener.error("Default character set is an unsupported encoding");
                             } catch (FileNotFoundException e) {
@@ -898,6 +928,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
      *
      * @return a {@link org.jenkinsci.plugins.gitclient.ChangelogCommand} object.
      */
+    @Override
     public ChangelogCommand changelog() {
         return new ChangelogCommand() {
 
@@ -908,38 +939,46 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             Integer n = null;
             Writer out = null;
 
+            @Override
             public ChangelogCommand excludes(String rev) {
                 revs.add(sanitize('^'+rev));
                 return this;
             }
 
+            @Override
             public ChangelogCommand excludes(ObjectId rev) {
                 return excludes(rev.name());
             }
 
+            @Override
             public ChangelogCommand includes(String rev) {
                 revs.add(rev);
                 return this;
             }
 
+            @Override
             public ChangelogCommand includes(ObjectId rev) {
                 return includes(rev.name());
             }
 
+            @Override
             public ChangelogCommand to(Writer w) {
                 this.out = w;
                 return this;
             }
 
+            @Override
             public ChangelogCommand max(int n) {
                 this.n = n;
                 return this;
             }
 
+            @Override
             public void abort() {
                 /* No cleanup needed to abort the CliGitAPIImpl ChangelogCommand */
             }
 
+            @Override
             public void execute() throws GitException, InterruptedException {
                 ArgumentListBuilder args = new ArgumentListBuilder(gitExe, "whatchanged", "--no-abbrev", "-M");
                 args.add("--format="+RAW);
@@ -955,9 +994,9 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                 // We want to decode bytestream to strings using UTF-8 encoding.
                 try (WriterOutputStream w = new WriterOutputStream(out, Charset.forName("UTF-8"))) {
                     if (launcher.launch().cmds(args).envs(environment).stdout(w).stderr(listener.getLogger()).pwd(workspace).join() != 0)
-                        throw new GitException("Error launching git whatchanged");
+                        throw new GitException("Error: " + args + " in " + workspace);
                 } catch (IOException e) {
-                    throw new GitException("Error launching git whatchanged",e);
+                    throw new GitException("Error: " + args + " in " + workspace, e);
                 }
             }
         };
@@ -1621,6 +1660,13 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
         File pass = null;
         File askpass = null;
         EnvVars env = environment;
+        if (!PROMPT_FOR_AUTHENTICATION && isAtLeastVersion(2, 3, 0, 0)) {
+            env = new EnvVars(env);
+            env.put("GIT_TERMINAL_PROMPT", "0"); // Don't prompt for auth from command line git
+            if (isWindows()) {
+                env.put("GCM_INTERACTIVE", "never"); // Don't prompt for auth from git credentials manager for windows
+            }
+        }
         try {
             if (credentials instanceof SSHUserPrivateKey) {
                 SSHUserPrivateKey sshUser = (SSHUserPrivateKey) credentials;
@@ -2071,7 +2117,12 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
      * @param fos output of "git branch -v --no-abbrev"
      * @return a {@link java.util.Set} object.
      */
-    private Set<Branch> parseBranches(String fos) {
+    /*package*/ Set<Branch> parseBranches(String fos) {
+        // JENKINS-34309 if the commit message contains line breaks,
+        // "git branch -v --no-abbrev" output will include CR (Carriage Return) characters.
+        // Replace all CR characters to avoid interpreting them as line endings
+        fos = fos.replaceAll("\\r", "");
+
         Set<Branch> branches = new HashSet<>();
         BufferedReader rdr = new BufferedReader(new StringReader(fos));
         String line;
@@ -2081,9 +2132,6 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                     // Line must contain 2 leading characters, branch
                     // name (at least 1 character), a space, and 40
                     // character SHA1.
-                    // JENKINS-34309 found cases where a Ctrl-M was
-                    // inserted into the output of
-                    // "git branch -v --no-abbrev"
                     continue;
                 }
                 // Ignore leading 2 characters (marker for current branch)
@@ -2091,7 +2139,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                 // Split fields into branch name, SHA1, and rest of line
                 // Fields are separated by one or more spaces
                 String[] branchVerboseOutput = line.substring(2).split(" +", 3);
-                if (branchVerboseOutput[1].length() == 40) {
+                if (branchVerboseOutput.length > 1 && branchVerboseOutput[1].length() == 40) {
                     branches.add(new Branch(branchVerboseOutput[0], ObjectId.fromString(branchVerboseOutput[1])));
                 }
             }
@@ -2171,6 +2219,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             public List<String> sparseCheckoutPaths = Collections.emptyList();
             public Integer timeout;
             public String lfsRemote;
+            public StandardCredentials lfsCredentials;
 
             public CheckoutCommand ref(String ref) {
                 this.ref = ref;
@@ -2199,6 +2248,12 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
 
             public CheckoutCommand lfsRemote(String lfsRemote) {
                 this.lfsRemote = lfsRemote;
+                return this;
+            }
+
+            @Override
+            public CheckoutCommand lfsCredentials(StandardCredentials lfsCredentials) {
+                this.lfsCredentials = lfsCredentials;
                 return this;
             }
 
@@ -2266,7 +2321,8 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
 
                     if (lfsRemote != null) {
                         final String url = getRemoteUrl(lfsRemote);
-                        StandardCredentials cred = credentials.get(url);
+                        StandardCredentials cred = lfsCredentials;
+                        if (cred == null) cred = credentials.get(url);
                         if (cred == null) cred = defaultCredentials;
                         ArgumentListBuilder lfsArgs = new ArgumentListBuilder();
                         lfsArgs.add("lfs");

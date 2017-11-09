@@ -129,6 +129,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.eclipse.jgit.api.RebaseCommand.Operation;
 import org.eclipse.jgit.api.RebaseResult;
+import org.eclipse.jgit.errors.MissingObjectException;
 
 /**
  * GitClient pure Java implementation using JGit.
@@ -279,10 +280,19 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                 return this;
             }
 
-            @Override
-            public CheckoutCommand lfsRemote(String lfsRemote) {
+            private CheckoutCommand lfsCheckoutIsNotSupported() {
                 listener.getLogger().println("[WARNING] JGit doesn't support LFS checkout. This flag is ignored.");
                 return this;
+            }
+
+            @Override
+            public CheckoutCommand lfsRemote(String lfsRemote) {
+                return lfsCheckoutIsNotSupported();
+            }
+
+            @Override
+            public CheckoutCommand lfsCredentials(StandardCredentials lfsCredentials) {
+                return lfsCheckoutIsNotSupported();
             }
 
             public void execute() throws GitException, InterruptedException {
@@ -1056,6 +1066,7 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
      *
      * @return a {@link org.jenkinsci.plugins.gitclient.ChangelogCommand} object.
      */
+    @Override
     public ChangelogCommand changelog() {
         return new ChangelogCommand() {
             Repository repo = getRepository();
@@ -1064,6 +1075,7 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             Writer out;
             boolean hasIncludedRev = false;
 
+            @Override
             public ChangelogCommand excludes(String rev) {
                 try {
                     return excludes(repo.resolve(rev));
@@ -1072,12 +1084,13 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                 }
             }
 
+            @Override
             public ChangelogCommand excludes(ObjectId rev) {
                 try {
                     walk.markUninteresting(walk.lookupCommit(rev));
                     return this;
                 } catch (IOException e) {
-                    throw new GitException(e);
+                    throw new GitException("Error: jgit excludes() in " + workspace + " " + e.getMessage(), e);
                 }
             }
 
@@ -1091,21 +1104,24 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                 }
             }
 
+            @Override
             public ChangelogCommand includes(ObjectId rev) {
                 try {
                     walk.markStart(walk.lookupCommit(rev));
                     hasIncludedRev = true;
                     return this;
                 } catch (IOException e) {
-                    throw new GitException(e);
+                    throw new GitException("Error: jgit includes() in " + workspace + " " + e.getMessage(), e);
                 }
             }
 
+            @Override
             public ChangelogCommand to(Writer w) {
                 this.out = w;
                 return this;
             }
 
+            @Override
             public ChangelogCommand max(int n) {
                 walk.setRevFilter(MaxCountRevFilter.create(n));
                 return this;
@@ -1117,6 +1133,7 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                 repo.close();
             }
 
+            @Override
             public void abort() {
                 closeResources();
             }
@@ -1128,7 +1145,11 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
              * or abort must be called for each ChangelogCommand or
              * files will remain open.
              */
+            @Override
             public void execute() throws GitException, InterruptedException {
+                if (out == null) {
+                    throw new IllegalStateException(); // Match CliGitAPIImpl
+                }
                 try (PrintWriter pw = new PrintWriter(out,false)) {
                     RawFormatter formatter= new RawFormatter();
                     if (!hasIncludedRev) {
@@ -1142,7 +1163,7 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                         formatter.format(commit, null, pw, true);
                     }
                 } catch (IOException e) {
-                    throw new GitException(e);
+                    throw new GitException("Error: jgit whatchanged in " + workspace + " " + e.getMessage(), e);
                 } finally {
                     closeResources();
                 }
@@ -1415,10 +1436,12 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                             else {
                                 try {
                                     File alternates = new File(workspace, ".git/objects/info/alternates");
+                                    String absoluteReference = objectsPath.getAbsolutePath().replace('\\', '/');
+                                    listener.getLogger().println("Using reference repository: " + reference);
                                     // git implementations on windows also use
                                     try (PrintWriter w = new PrintWriter(alternates, "UTF-8")) {
                                         // git implementations on windows also use
-                                        w.print(objectsPath.getAbsolutePath().replace('\\', '/'));
+                                        w.print(absoluteReference);
                                     }
                                 } catch (FileNotFoundException e) {
                                     listener.error("Failed to setup reference");
