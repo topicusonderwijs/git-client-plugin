@@ -20,6 +20,7 @@ import hudson.model.TaskListener;
 import hudson.plugins.git.Branch;
 import hudson.plugins.git.GitException;
 import hudson.plugins.git.GitLockFailedException;
+import hudson.plugins.git.GitObject;
 import hudson.plugins.git.IGitAPI;
 import hudson.plugins.git.IndexEntry;
 import hudson.plugins.git.Revision;
@@ -141,6 +142,25 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
     private Map<String, StandardCredentials> credentials = new HashMap<>();
     private StandardCredentials defaultCredentials;
     private StandardCredentials lfsCredentials;
+
+    /* git config --get-regex applies the regex to match keys, and returns all matches (including substring matches).
+     * Thus, a config call:
+     *   git config -f .gitmodules --get-regexp "^submodule\.([^ ]+)\.url"
+     * will report two lines of output if the submodule URL includes ".url":
+     *   submodule.modules/JENKINS-46504.url.path modules/JENKINS-46504.url
+     *   submodule.modules/JENKINS-46504.url.url https://github.com/MarkEWaite/JENKINS-46054.url
+     * The code originally used the same pattern for get-regexp and for output parsing.
+     * By using the same pattern in both places, it incorrectly took the first line
+     * of output as the URL of a submodule (when it is instead the path of a submodule).
+    */
+    private final static String SUBMODULE_REMOTE_PATTERN_CONFIG_KEY = "^submodule\\.([^ ]+)\\.url";
+
+    /* See comments for SUBMODULE_REMOTE_PATTERN_CONFIG_KEY to explain why this
+     * regular expression string adds the trailing space character as part of its match.
+     * Without the trailing whitespace character in the pattern, too many matches are found.
+     */
+    /* Package protected for testing */
+    final static String SUBMODULE_REMOTE_PATTERN_STRING = SUBMODULE_REMOTE_PATTERN_CONFIG_KEY + "\\b\\s";
 
     private void warnIfWindowsTemporaryDirNameHasSpaces() {
         if (!isWindows()) {
@@ -1140,7 +1160,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                 try {
                     // We might fail if we have no modules, so catch this
                     // exception and just return.
-                    cfgOutput = launchCommand("config", "-f", ".gitmodules", "--get-regexp", "^submodule\\.(.*)\\.url");
+                    cfgOutput = launchCommand("config", "-f", ".gitmodules", "--get-regexp", SUBMODULE_REMOTE_PATTERN_CONFIG_KEY);
                 } catch (GitException e) {
                     listener.error("No submodules found.");
                     return;
@@ -1149,7 +1169,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                 // Use a matcher to find each configured submodule name, and
                 // then run the submodule update command with the provided
                 // path.
-                Pattern pattern = Pattern.compile("^submodule\\.(.*)\\.url", Pattern.MULTILINE);
+                Pattern pattern = Pattern.compile(SUBMODULE_REMOTE_PATTERN_STRING, Pattern.MULTILINE);
                 Matcher matcher = pattern.matcher(cfgOutput);
                 while (matcher.find()) {
                     ArgumentListBuilder perModuleArgs = args.clone();
@@ -1286,7 +1306,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
         }
         String line = firstLine(result);
         if (line == null)
-            throw new GitException("No output from bare repository check for " + GIT_DIR);
+            throw new GitException("No output from git config check for " + GIT_DIR);
         return line.trim();
     }
 
@@ -2467,6 +2487,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
     public RevListCommand revList_() {
         return new RevListCommand() {
             public boolean all;
+            public boolean nowalk;
             public boolean firstParent;
             public String refspec;
             public List<ObjectId> out;
@@ -2480,7 +2501,14 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                 this.all = all;
                 return this;
             }
-            
+            public RevListCommand nowalk(boolean nowalk) {
+                // --no-walk wasn't introduced until v1.5.3
+                if (isAtLeastVersion(1, 5, 3, 0)) {
+                    this.nowalk = nowalk;
+                }
+                return this;
+            }
+
             public RevListCommand firstParent() {
                 return firstParent(true);
             }
@@ -2510,6 +2538,10 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
 
                 if (all) {
                    args.add("--all");
+                }
+
+                if (nowalk) {
+                    args.add("--no-walk");
                 }
 
                 if (refspec != null) {
@@ -2566,9 +2598,17 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             return false;
         }
         try {
-            List<ObjectId> revs = revList(commit.name());
+            // Use revList_() directly in order to pass .nowalk(true) which
+            // allows us to bypass the unnecessary revision walk when we
+            // only care to determine if the commit exists.
+            List<ObjectId> oidList = new ArrayList<>();
+            RevListCommand revListCommand = revList_();
+            revListCommand.reference(commit.name());
+            revListCommand.to(oidList);
+            revListCommand.nowalk(true);
+            revListCommand.execute();
 
-            return revs.size() != 0;
+            return oidList.size() != 0;
         } catch (GitException e) {
             return false;
         }
@@ -2838,7 +2878,9 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
         Map<String, ObjectId> references = new HashMap<>();
         String[] lines = result.split("\n");
         for (String line : lines) {
-            if (line.length() < 41) throw new GitException("unexpected ls-remote output " + line);
+            if (line.length() < 41) {
+                continue; // throw new GitException("unexpected ls-remote output " + line);
+            }
             String refName = line.substring(41);
             ObjectId refObjectId = ObjectId.fromString(line.substring(0, 40));
             if (refName.startsWith("refs/tags") && refName.endsWith("^{}")) {
@@ -3004,5 +3046,57 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             }
         }
         return false;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Set<GitObject> getTags() throws GitException, InterruptedException {
+        ArgumentListBuilder args = new ArgumentListBuilder("show-ref", "--tags", "-d");
+        String result;
+        try {
+            result = launchCommandIn(args, workspace);
+        } catch (GitException ge) {
+            /* If no tags, then git show-ref --tags -d returns non-zero */
+            result = "";
+        }
+
+        /*
+        Output shows SHA1 and tag with (optional) marker for annotated tags
+        7ac27f7a051e1017da9f7c45ade8f091dbe6f99d refs/tags/git-3.6.4
+        7b5856ef2b4d35530a06d6482d0f4e972769d89b refs/tags/git-3.6.4^{}
+         */
+        String[] output = result.split("[\\n\\r]+");
+        if (output.length == 0 || (output.length == 1 && output[0].isEmpty())) {
+            return Collections.EMPTY_SET;
+        }
+        Pattern pattern = Pattern.compile("(\\p{XDigit}{40})\\s+refs/tags/([^^]+)(\\^\\{\\})?");
+        Map<String, ObjectId> tagMap = new HashMap<>();
+        for (String line : output) {
+            Matcher matcher = pattern.matcher(line);
+            if (!matcher.find()) {
+                // Log the surprise and skip the line
+                String message = MessageFormat.format(
+                        "git show-ref --tags -d output not matched in line: {0}",
+                        line);
+                listener.getLogger().println(message);
+                continue;
+            }
+            String sha1String = matcher.group(1);
+            String tagName = matcher.group(2);
+            String trailingText = matcher.group(3);
+            boolean isPeeledRef = false;
+            if (trailingText != null && trailingText.equals("^{}")) { // Line ends with '^{}'
+                isPeeledRef = true;
+            }
+            /* Prefer peeled ref if available (for tag commit), otherwise take first tag reference seen */
+            if (isPeeledRef || !tagMap.containsKey(tagName)) {
+                tagMap.put(tagName, ObjectId.fromString(sha1String));
+            }
+        }
+        Set<GitObject> tags = new HashSet<>(tagMap.size());
+        for (Map.Entry<String, ObjectId> entry : tagMap.entrySet()) {
+            tags.add(new GitObject(entry.getKey(), entry.getValue()));
+        }
+        return tags;
     }
 }
