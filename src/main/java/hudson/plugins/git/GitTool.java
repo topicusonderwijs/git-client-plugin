@@ -62,7 +62,7 @@ public class GitTool extends ToolInstallation implements NodeSpecific<GitTool>, 
     }
 
     private static GitTool[] getInstallations(DescriptorImpl descriptor) {
-        GitTool[] installations = null;
+        GitTool[] installations;
         try {
             installations = descriptor.getInstallations();
         } catch (NullPointerException e) {
@@ -78,9 +78,6 @@ public class GitTool extends ToolInstallation implements NodeSpecific<GitTool>, 
      */
     public static GitTool getDefaultInstallation() {
         Jenkins jenkinsInstance = Jenkins.getInstance();
-        if (jenkinsInstance == null) {
-            return null;
-        }
         DescriptorImpl gitTools = jenkinsInstance.getDescriptorByType(GitTool.DescriptorImpl.class);
         GitTool tool = gitTools.getInstallation(GitTool.DEFAULT);
         if (tool != null) {
@@ -119,9 +116,6 @@ public class GitTool extends ToolInstallation implements NodeSpecific<GitTool>, 
         //Creates default tool installation if needed. Uses "git" or migrates data from previous versions
 
         Jenkins jenkinsInstance = Jenkins.getInstance();
-        if (jenkinsInstance == null) {
-            return;
-        }
         DescriptorImpl descriptor = (DescriptorImpl) jenkinsInstance.getDescriptor(GitTool.class);
         GitTool[] installations = getInstallations(descriptor);
 
@@ -191,9 +185,6 @@ public class GitTool extends ToolInstallation implements NodeSpecific<GitTool>, 
         public List<ToolDescriptor<? extends GitTool>> getApplicableDescriptors() {
             List<ToolDescriptor<? extends GitTool>> r = new ArrayList<>();
             Jenkins jenkinsInstance = Jenkins.getInstance();
-            if (jenkinsInstance == null) {
-                return r;
-            }
             for (ToolDescriptor<?> td : jenkinsInstance.<ToolInstallation,ToolDescriptor<?>>getDescriptorList(ToolInstallation.class)) {
                 if (GitTool.class.isAssignableFrom(td.clazz)) { // This checks cast is allowed
                     r.add((ToolDescriptor<? extends GitTool>)td); // This is the unchecked cast

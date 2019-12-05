@@ -23,14 +23,13 @@ public class NetrcTest
     public TemporaryFolder folder = new TemporaryFolder();
 
     private static final String TEST_NETRC_FILE_1 = "netrc_1";
-    private static final String TEST_NETRC_FILE_1a = "netrc_1a";
+    private static final String TEST_NETRC_FILE_1A = "netrc_1a";
     private static final String TEST_NETRC_FILE_2 = "netrc_2";
     private String testFilePath_1;
     private String testFilePath_1a;
     private String testFilePath_2;
 
-
-    enum TestHost {
+    private enum TestHost {
         H1_01("1-srvr-lp.example.com", "jenkins", "pw4jenkins"),
         H1_02("2-ldap-lp.example.com", "ldap", "pw4ldap"),
         H1_03("3-jenk-pl.example.com", "jenkins", "jenkinspwd"),
@@ -56,9 +55,9 @@ public class NetrcTest
         H2_03("builder3.example.com", null, null),
         H2_04("builder4.example.com", "jenk", "myvoice");
 
-        public String machine;
-        public String login;
-        public String password;
+        private String machine;
+        private String login;
+        private String password;
 
         private TestHost(String _machine, String _login, String _password)
         {
@@ -103,8 +102,8 @@ public class NetrcTest
         testFilePath_1 = folder.newFile(TEST_NETRC_FILE_1).getAbsolutePath();
         copyResourceContents(TEST_NETRC_FILE_1 + ".in", testFilePath_1);
 
-        testFilePath_1a = folder.newFile(TEST_NETRC_FILE_1a).getAbsolutePath();
-        copyResourceContents(TEST_NETRC_FILE_1a + ".in", testFilePath_1a);
+        testFilePath_1a = folder.newFile(TEST_NETRC_FILE_1A).getAbsolutePath();
+        copyResourceContents(TEST_NETRC_FILE_1A + ".in", testFilePath_1a);
 
         testFilePath_2 = folder.newFile(TEST_NETRC_FILE_2).getAbsolutePath();
         copyResourceContents(TEST_NETRC_FILE_2 + ".in", testFilePath_2);

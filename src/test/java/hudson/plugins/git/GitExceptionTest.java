@@ -18,6 +18,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import static org.junit.Assert.*;
+import static org.junit.Assume.*;
 import org.junit.rules.TemporaryFolder;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assume.*;
@@ -53,18 +54,6 @@ public class GitExceptionTest {
         thrown.expectMessage(is(message));
         thrown.expectCause(is(IOException.class));
         throw new GitException(message, new IOException("Custom IOException message"));
-    }
-
-    @Test
-    public void initDefaultImplThrowsGitException() throws GitAPIException, IOException, InterruptedException {
-        File badDirectory = new File("/this/is/a/bad/dir");
-        if (isWindows()) {
-            badDirectory = new File("\\\\badserver\\badshare\\bad\\dir");
-        }
-        GitClient defaultClient = Git.with(TaskListener.NULL, new EnvVars()).in(badDirectory).using("Default").getClient();
-        assertNotNull(defaultClient);
-        thrown.expect(GitException.class);
-        defaultClient.init_().workspace(badDirectory.getAbsolutePath()).execute();
     }
 
     @Test

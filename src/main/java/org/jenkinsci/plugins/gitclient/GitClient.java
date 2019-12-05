@@ -49,7 +49,6 @@ public interface GitClient {
     CredentialsMatcher CREDENTIALS_MATCHER = CredentialsMatchers.anyOf(
             CredentialsMatchers.instanceOf(StandardUsernamePasswordCredentials.class),
             CredentialsMatchers.instanceOf(SSHUserPrivateKey.class)
-            // TODO does anyone use SSL client certificates with GIT?
     );
 
     /**
@@ -436,12 +435,23 @@ public interface GitClient {
     void clean() throws GitException, InterruptedException;
 
     /**
+     * Fully revert working copy to a clean state, i.e. run both
+     * <a href="https://www.kernel.org/pub/software/scm/git/docs/git-reset.html">git-reset(1) --hard</a> then
+     * <a href="https://www.kernel.org/pub/software/scm/git/docs/git-clean.html">git-clean(1)</a> for working copy to
+     * match a fresh clone.
+     *
+     * @param cleanSubmodule flag to add extra -f
+     * @throws hudson.plugins.git.GitException if underlying git operation fails.
+     * @throws java.lang.InterruptedException if interrupted.
+     */
+    void clean(boolean cleanSubmodule) throws GitException, InterruptedException;
+
+    /**
      * clean_.
      *
      * @return a {@link org.jenkinsci.plugins.gitclient.CleanCommand} object.
      */
     CleanCommand clean_(); // can't use 'clean' as legacy IGitAPI already define this method
-
 
     // --- manage branches
 

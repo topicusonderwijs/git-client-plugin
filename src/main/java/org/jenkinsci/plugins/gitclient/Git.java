@@ -2,7 +2,6 @@ package org.jenkinsci.plugins.gitclient;
 
 import hudson.EnvVars;
 import hudson.FilePath;
-import hudson.FilePath.FileCallable;
 import hudson.Main;
 import hudson.model.TaskListener;
 import hudson.plugins.git.GitAPI;
@@ -119,28 +118,7 @@ public class Git implements Serializable {
      * @throws java.lang.InterruptedException if interrupted.
      */
     public GitClient getClient() throws IOException, InterruptedException {
-        jenkins.MasterToSlaveFileCallable<GitClient> callable = new jenkins.MasterToSlaveFileCallable<GitClient>() {
-            public GitClient invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
-                if (listener == null) listener = TaskListener.NULL;
-                if (env == null) env = new EnvVars();
-
-                if (Main.isUnitTest && System.getProperty(Git.class.getName() + ".mockClient") != null) {
-                    return initMockClient(System.getProperty(Git.class.getName() + ".mockClient"),
-                            exe, env, f, listener);
-                }
-
-                if (exe == null || JGitTool.MAGIC_EXENAME.equalsIgnoreCase(exe)) {
-                    return new JGitAPIImpl(f, listener);
-                }
-
-                if (JGitApacheTool.MAGIC_EXENAME.equalsIgnoreCase(exe)) {
-                    final PreemptiveAuthHttpClientConnectionFactory factory = new PreemptiveAuthHttpClientConnectionFactory();
-                    return new JGitAPIImpl(f, listener, factory);
-                }
-                // Ensure we return a backward compatible GitAPI, even API only claim to provide a GitClient
-                return new GitAPI(exe, f, listener, env);
-            }
-        };
+        jenkins.MasterToSlaveFileCallable<GitClient> callable = new GitAPIMasterToSlaveFileCallable();
         GitClient git = (repository!=null ? repository.act(callable) : callable.invoke(null,null));
         Jenkins jenkinsInstance = Jenkins.getInstance();
         if (jenkinsInstance != null && git != null)
@@ -168,4 +146,27 @@ public class Git implements Serializable {
     public static final boolean USE_CLI = Boolean.valueOf(System.getProperty(Git.class.getName() + ".useCLI", "true"));
 
     private static final long serialVersionUID = 1L;
+
+    private class GitAPIMasterToSlaveFileCallable extends jenkins.MasterToSlaveFileCallable<GitClient> {
+        public GitClient invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
+            if (listener == null) listener = TaskListener.NULL;
+            if (env == null) env = new EnvVars();
+
+            if (Main.isUnitTest && System.getProperty(Git.class.getName() + ".mockClient") != null) {
+                return initMockClient(System.getProperty(Git.class.getName() + ".mockClient"),
+                        exe, env, f, listener);
+            }
+
+            if (exe == null || JGitTool.MAGIC_EXENAME.equalsIgnoreCase(exe)) {
+                return new JGitAPIImpl(f, listener);
+            }
+
+            if (JGitApacheTool.MAGIC_EXENAME.equalsIgnoreCase(exe)) {
+                final PreemptiveAuthHttpClientConnectionFactory factory = new PreemptiveAuthHttpClientConnectionFactory();
+                return new JGitAPIImpl(f, listener, factory);
+            }
+            // Ensure we return a backward compatible GitAPI, even API only claim to provide a GitClient
+            return new GitAPI(exe, f, listener, env);
+        }
+    }
 }

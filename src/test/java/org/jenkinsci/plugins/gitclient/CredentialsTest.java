@@ -86,9 +86,6 @@ public class CredentialsTest {
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
 
-    @Rule
-    public TestRule timeout = new DisableOnDebug(Timeout.seconds(17));
-
     private int logCount;
     private LogHandler handler;
     private LogTaskListener listener;
@@ -271,16 +268,6 @@ public class CredentialsTest {
                             continue;
                         }
                         if (implementation.startsWith("jgit") && skipIf.equals("jgit")) { // Treat jgitapache like jgit
-                            continue;
-                        }
-                        // JGit 4.5 as used in git client plugin prior to 3.0.0 does not handle
-                        // github.com:MarkEWaite/tasks.git correctly (no username in the URL), while it handles
-                        // git@github.com:MarkEWaite/tasks.git correctly.
-                        // This special case should be removed when JGit 4.11 is used.
-                        // JGit 4.11 as used in git client plugin prior to 3.0.0 handles
-                        // github.com:MarkEWaite/tasks.git correctly (no username in the URL), and handles
-                        // git@github.com:MarkEWaite/tasks.git correctly.
-                        if (implementation.startsWith("jgit") && skipIf.startsWith("jgit-4.5")) { // Treat jgitapache like jgit
                             continue;
                         }
                     }
