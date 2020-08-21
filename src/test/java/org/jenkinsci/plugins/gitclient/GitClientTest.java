@@ -169,13 +169,6 @@ public class GitClientTest {
         return arguments;
     }
 
-    @BeforeClass
-    public static void setCliGitDefaults() throws Exception {
-        /* Command line git commands fail unless certain default values are set */
-        CliGitCommand gitCmd = new CliGitCommand(null);
-        gitCmd.setDefaults();
-    }
-
     /**
      * Mirror the git-client-plugin repo so that the tests have a reasonable and
      * repeatable set of commits, tags, and branches.
@@ -224,6 +217,9 @@ public class GitClientTest {
         gitClient.init_().workspace(repoRoot.getAbsolutePath()).execute();
         assertTrue("Missing " + gitDir, gitDir.isDirectory());
         gitClient.setRemoteUrl("origin", srcRepoDir.getAbsolutePath());
+        CliGitCommand gitCmd = new CliGitCommand(gitClient);
+        gitCmd.run("config", "user.name", "Vojtěch GitClientTest Zweibrücken-Šafařík");
+        gitCmd.run("config", "user.email", "email.from.git.client@example.com");
     }
 
     private static final String COMMITTED_ONE_TEXT_FILE = "Committed one text file";
@@ -607,6 +603,9 @@ public class GitClientTest {
     public void testIsCommitInRepo() throws Exception {
         assertTrue(srcGitClient.isCommitInRepo(upstreamCommit));
         assertFalse(gitClient.isCommitInRepo(upstreamCommit));
+        assertFalse(gitClient.isCommitInRepo(null)); // NPE safety check
+        // this MAY fail if commit has this exact sha1, but please admit this would be unlucky
+        assertFalse(gitClient.isCommitInRepo(ObjectId.fromString("1111111111111111111111111111111111111111")));
     }
 
     private void assertExceptionMessageContains(GitException ge, String expectedSubstring) {
@@ -813,6 +812,15 @@ public class GitClientTest {
     }
 
     @Test
+    @Deprecated
+    public void testGetRemoteUrl_two_args() throws Exception {
+        IGitAPI iGitAPI = (IGitAPI) gitClient;
+        String originUrl = gitClient.getRemoteUrl("origin");
+        assertThat("Null URL arg", iGitAPI.getRemoteUrl("origin", null), is(originUrl));
+        assertThat("Empty string URL arg", iGitAPI.getRemoteUrl("origin", ""), is(originUrl));
+    }
+
+    @Test
     public void testSetRemoteUrl() throws Exception {
         assertEquals(srcRepoDir.getAbsolutePath(), gitClient.getRemoteUrl("origin"));
         gitClient.setRemoteUrl("origin", upstreamRepoURL);
@@ -831,6 +839,9 @@ public class GitClientTest {
         File repoRootTemp = tempFolder.newFolder();
         GitClient gitClientTemp = Git.with(TaskListener.NULL, new EnvVars()).in(repoRootTemp).using(gitImplName).getClient();
         gitClientTemp.init();
+        CliGitCommand gitCmd = new CliGitCommand(gitClientTemp);
+        gitCmd.run("config", "user.name", "Vojtěch GitClientTest Zweibrücken-Šafařík");
+        gitCmd.run("config", "user.email", "email.from.git.client@example.com");
         FilePath gitClientFilePath = gitClientTemp.getWorkTree();
         FilePath gitClientTempFile = gitClientFilePath.createTextTempFile("aPre", ".txt", "file contents");
         gitClientTemp.add(".");
@@ -875,6 +886,9 @@ public class GitClientTest {
         File repoRootTemp = tempFolder.newFolder();
         GitClient gitClientTemp = Git.with(TaskListener.NULL, new EnvVars()).in(repoRootTemp).using(gitImplName).getClient();
         gitClientTemp.init();
+        CliGitCommand gitCmd = new CliGitCommand(gitClientTemp);
+        gitCmd.run("config", "user.name", "Vojtěch GitClientTest temp Zweibrücken-Šafařík");
+        gitCmd.run("config", "user.email", "email.by.client@example.com");
         FilePath gitClientFilePath = gitClientTemp.getWorkTree();
         FilePath gitClientTempFile = gitClientFilePath.createTextTempFile("aPre", ".txt", "file contents");
         gitClientTemp.add(".");
@@ -2104,6 +2118,23 @@ public class GitClientTest {
         assertThat(branchNames, containsInAnyOrder(expectedBranchNames));
     }
 
+    /* Enable long paths in gitClient workspace if running on Windows.
+     * Assumes that the repository is at a directory path that is less
+     * than 256 characters and that the checkout operation will
+     * attempt to create a directory path greater than 256 characters.
+     */
+    private void enableLongPaths(GitClient gitClient) throws InterruptedException, IOException {
+        CliGitAPIImpl cliGitClient;
+        if (gitClient instanceof CliGitAPIImpl && isWindows()) {
+            /* Enable core.longpaths prior to fetch on Windows -
+             * testSubmodulesUsedFromOtherBranches submodule test will
+             * fail with default Windows location otherwise
+             */
+            cliGitClient = (CliGitAPIImpl) gitClient;
+            cliGitClient.launchCommand("config", "core.longpaths", "true");
+        }
+    }
+
     @Issue("JENKINS-37419") // Submodules from other branches are used in checkout
     @Test
     public void testSubmodulesUsedFromOtherBranches() throws Exception {
@@ -2111,6 +2142,8 @@ public class GitClientTest {
         assumeThat(gitImplName, is("git")); // JGit implementation doesn't handle renamed submodules
         String oldBranchName = "tests/getSubmodules";
         String upstream = fetchUpstream(oldBranchName);
+        /* Enable long paths to prevent checkout failure on default Windows workspace with MSI installer */
+        enableLongPaths(gitClient);
         if (random.nextBoolean()) {
             gitClient.checkoutBranch(oldBranchName, upstream + "/" + oldBranchName);
         } else {
@@ -2175,6 +2208,9 @@ public class GitClientTest {
         assertTrue("Failed to create URL repo dir", urlRepoDir.mkdir());
         GitClient urlRepoClient = Git.with(TaskListener.NULL, new EnvVars()).in(urlRepoDir).using(gitImplName).getClient();
         urlRepoClient.init();
+        CliGitCommand gitCmd = new CliGitCommand(urlRepoClient);
+        gitCmd.run("config", "user.name", "Vojtěch GitClientTest Zweibrücken-Šafařík");
+        gitCmd.run("config", "user.email", "email.from.git.client@example.com");
         File readme = new File(urlRepoDir, "readme");
         String readmeText = "This repo includes .url in its directory name (" + random.nextInt() + ")";
         Files.write(Paths.get(readme.getAbsolutePath()), readmeText.getBytes());
@@ -2186,6 +2222,9 @@ public class GitClientTest {
         assertTrue("Failed to create repo dir that will have submodule", repoHasSubmodule.mkdir());
         GitClient repoHasSubmoduleClient = Git.with(TaskListener.NULL, new EnvVars()).in(repoHasSubmodule).using(gitImplName).getClient();
         repoHasSubmoduleClient.init();
+        gitCmd = new CliGitCommand(repoHasSubmoduleClient);
+        gitCmd.run("config", "user.name", "Vojtěch GitClientTest repo submodule Zweibrücken-Šafařík");
+        gitCmd.run("config", "user.email", "email.from.git.client@example.com");
         File hasSubmoduleReadme = new File(repoHasSubmodule, "readme");
         String hasSubmoduleReadmeText = "Repo has a submodule that includes .url in its directory name (" + random.nextInt() + ")";
         Files.write(Paths.get(hasSubmoduleReadme.getAbsolutePath()), hasSubmoduleReadmeText.getBytes());

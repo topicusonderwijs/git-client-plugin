@@ -2258,7 +2258,8 @@ public class JGitAPIImpl extends LegacyCompatibleGitAPIImpl {
                     update.call();
                     if (recursive) {
                         for (JGitAPIImpl sub : submodules()) {
-                            sub.submoduleUpdate().recursive(recursive).execute();
+                            /* Intentionally using the deprecated method because the replacement method is not serializable. */
+                            sub.submoduleUpdate(recursive);
                         }
                     }
                 } catch (IOException | GitAPIException e) {

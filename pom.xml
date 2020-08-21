@@ -5,13 +5,13 @@
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>4.3</version>
+    <version>4.6</version>
     <relativePath />
   </parent>
 
   <groupId>org.jenkins-ci.plugins</groupId>
   <artifactId>git-client</artifactId>
-  <version>3.3.1-topicus1</version>
+  <version>3.4.1-topicus1</version>
   <packaging>hpi</packaging>
 
   <name>Jenkins Git client plugin</name>
@@ -49,17 +49,17 @@
     <connection>scm:git:git://github.com/jenkinsci/${project.artifactId}-plugin.git</connection>
     <developerConnection>scm:git:git@github.com:jenkinsci/${project.artifactId}-plugin.git</developerConnection>
     <url>https://github.com/jenkinsci/${project.artifactId}-plugin</url>
-    <tag>git-client-3.3.1</tag>
+    <tag>git-client-3.4.1</tag>
   </scm>
 
   <properties>
-    <revision>3.3.1</revision>
+    <revision>3.4.1</revision>
     <changelist>-SNAPSHOT</changelist>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <argLine>-Dfile.encoding=${project.build.sourceEncoding}</argLine>
     <jenkins.version>2.204.1</jenkins.version>
     <java.level>8</java.level>
-    <jgit.version>5.8.0.202006091008-r</jgit.version>
+    <jgit.version>5.8.1.202007141445-r</jgit.version>
     <configuration-as-code.version>1.36</configuration-as-code.version>
     <slf4jVersion>1.7.26</slf4jVersion>
     <spotbugs.effort>Max</spotbugs.effort>
@@ -188,11 +188,16 @@
       <groupId>org.jenkins-ci.plugins</groupId>
       <artifactId>structs</artifactId>
     </dependency>
-    <dependency>
+    <dependency> <!-- Credentials test requires scm-api -->
       <groupId>org.jenkins-ci.plugins</groupId>
       <artifactId>scm-api</artifactId>
-        <classifier>tests</classifier>
-        <scope>test</scope>
+      <scope>test</scope>
+    </dependency>
+    <dependency> <!-- Tests require the scm-api-tests jar -->
+      <groupId>org.jenkins-ci.plugins</groupId>
+      <artifactId>scm-api</artifactId>
+      <classifier>tests</classifier>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.jenkins-ci.plugins</groupId>
@@ -241,7 +246,7 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-text</artifactId>
-      <version>1.8</version>
+      <version>1.9</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -271,7 +276,7 @@
         </exclusion>
       </exclusions>
       <optional>true</optional>
-      <version>4.0.6</version>
+      <version>4.1.1</version>
     </dependency>
     <dependency>
       <groupId>org.jenkins-ci.plugins</groupId>
@@ -339,7 +344,7 @@
           <dependency>
             <groupId>com.github.spotbugs</groupId>
             <artifactId>spotbugs</artifactId>
-            <version>4.0.6</version>
+            <version>4.1.1</version>
           </dependency>
         </dependencies>
       </plugin>

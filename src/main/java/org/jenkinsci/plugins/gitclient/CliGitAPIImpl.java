@@ -250,6 +250,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
         String version = "";
         try {
             version = launchCommand("--version").trim();
+            listener.getLogger().println(" > git --version # '" + version + "'");
         } catch (Throwable e) {
         }
 
@@ -1873,7 +1874,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             return Files.createTempFile(prefix, suffix).toFile();
         }
         Set<PosixFilePermission> ownerOnly = PosixFilePermissions.fromString("rw-------");
-        FileAttribute fileAttribute = PosixFilePermissions.asFileAttribute(ownerOnly);
+        FileAttribute<Set<PosixFilePermission>> fileAttribute = PosixFilePermissions.asFileAttribute(ownerOnly);
         return Files.createTempFile(prefix, suffix, fileAttribute).toFile();
     }
 
@@ -1939,7 +1940,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             return createTempFileInSystemDir(prefix, suffix);
         }
         Set<PosixFilePermission> ownerOnly = PosixFilePermissions.fromString("rw-------");
-        FileAttribute fileAttribute = PosixFilePermissions.asFileAttribute(ownerOnly);
+        FileAttribute<Set<PosixFilePermission>> fileAttribute = PosixFilePermissions.asFileAttribute(ownerOnly);
         return Files.createTempFile(tmpPath, prefix, suffix, fileAttribute).toFile();
     }
 
@@ -2217,27 +2218,40 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
     }
 
     private File createPassphraseFile(SSHUserPrivateKey sshUser) throws IOException {
+        String charset = computeCredentialFileCharset("passphrase", "UTF-8");
         File passphraseFile = createTempFile("phrase", ".txt");
-        try (PrintWriter w = new PrintWriter(passphraseFile, "UTF-8")) {
+        try (PrintWriter w = new PrintWriter(passphraseFile, charset)) {
             w.println(Secret.toString(sshUser.getPassphrase()));
         }
         return passphraseFile;
     }
 
     private File createUsernameFile(StandardUsernamePasswordCredentials userPass) throws IOException {
+        String charset = computeCredentialFileCharset("name", "UTF-8");
         File usernameFile = createTempFile("username", ".txt");
-        try (PrintWriter w = new PrintWriter(usernameFile, "UTF-8")) {
+        try (PrintWriter w = new PrintWriter(usernameFile, charset)) {
             w.println(userPass.getUsername());
         }
         return usernameFile;
     }
 
     private File createPasswordFile(StandardUsernamePasswordCredentials userPass) throws IOException {
+        String charset = computeCredentialFileCharset("password", "UTF-8");
         File passwordFile = createTempFile("password", ".txt");
-        try (PrintWriter w = new PrintWriter(passwordFile, "UTF-8")) {
+        try (PrintWriter w = new PrintWriter(passwordFile, charset)) {
             w.println(Secret.toString(userPass.getPassword()));
         }
         return passwordFile;
+    }
+
+    private String computeCredentialFileCharset(String context, String defaultValue) {
+        String property = CliGitAPIImpl.class.getName() + ".user." + context + ".file.encoding";
+        if (isZos() && System.getProperty(property) != null) {
+            String charset = Charset.forName(System.getProperty(property)).toString();
+	    listener.getLogger().println("Using " + context + " charset '" + charset + "'");
+            return charset;
+        }
+        return defaultValue;
     }
 
     private String getPathToExe(String userGitExe) {
@@ -3622,7 +3636,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
          */
         String[] output = result.split("[\\n\\r]+");
         if (output.length == 0 || (output.length == 1 && output[0].isEmpty())) {
-            return Collections.EMPTY_SET;
+            return Collections.<GitObject>emptySet();
         }
         Pattern pattern = Pattern.compile("(\\p{XDigit}{40})\\s+refs/tags/([^^]+)(\\^\\{\\})?");
         Map<String, ObjectId> tagMap = new HashMap<>();
