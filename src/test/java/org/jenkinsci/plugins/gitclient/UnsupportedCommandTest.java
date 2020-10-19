@@ -141,6 +141,12 @@ public class UnsupportedCommandTest {
     }
 
     @Test
+    public void testThreadsNull() {
+        unsupportedCommand.threads(null);
+        assertTrue(unsupportedCommand.determineSupportForJGit());
+    }
+
+    @Test
     public void testThreadsZero() {
         unsupportedCommand.threads(0);
         assertTrue(unsupportedCommand.determineSupportForJGit());
@@ -215,6 +221,20 @@ public class UnsupportedCommandTest {
     @Test
     public void testUseBranch() {
         unsupportedCommand.useBranch("some-submodule", "some-branch");
+        assertFalse(unsupportedCommand.determineSupportForJGit());
+    }
+
+    @Test
+    public void testGitPublisherDisabled() {
+        /* Disabled git publisher is allowed to use JGit */
+        unsupportedCommand.gitPublisher(false);
+        assertTrue(unsupportedCommand.determineSupportForJGit());
+    }
+
+    @Test
+    public void testGitPublisher() {
+        /* Enabled git publisher must not use JGit */
+        unsupportedCommand.gitPublisher(true);
         assertFalse(unsupportedCommand.determineSupportForJGit());
     }
 

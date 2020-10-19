@@ -118,8 +118,8 @@ public class UnsupportedCommand {
      * @param threads count of threads to use for parallel submodule update
      * @return this for chaining
      */
-    public UnsupportedCommand threads(int threads) {
-        if (threads != 0) {
+    public UnsupportedCommand threads(Integer threads) {
+        if (threads != null && threads != 0) {
             useJGit = false;
         }
         return this;
@@ -173,6 +173,18 @@ public class UnsupportedCommand {
      */
     public UnsupportedCommand useBranch(String submodule, String branchname) {
         if (submodule != null || branchname != null) {
+            useJGit = false;
+        }
+        return this;
+    }
+
+    /**
+     * JGit doesn't support Git Publisher.
+     * @param isEnabled if true, then git publisher post-build action is enabled in this context
+     * @return this for chaining
+     */
+    public UnsupportedCommand gitPublisher(boolean isEnabled) {
+        if (isEnabled) {
             useJGit = false;
         }
         return this;
