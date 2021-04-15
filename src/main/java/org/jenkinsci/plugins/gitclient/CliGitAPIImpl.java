@@ -84,8 +84,6 @@ import java.util.stream.Collectors;
  */
 public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
 
-    private static final boolean acceptSelfSignedCertificates;
-
     /**
      * Constant which can block use of setsid in git calls for ssh credentialed operations.
      *
@@ -163,7 +161,6 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
     );
 
     static {
-        acceptSelfSignedCertificates = Boolean.getBoolean(GitClient.class.getName() + ".untrustedSSL");
         CALL_SETSID = setsidExists() && USE_SETSID;
     }
 
@@ -334,7 +331,9 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
     }
 
     /**
-     * hasGitRepo.
+     * Returns true if this workspace has a git repository.
+     * Also returns true if this workspace contains an empty .git directory and
+     * a parent directory has a git repository.
      *
      * @return true if this workspace has a git repository
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
@@ -346,6 +345,35 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             // Check if this is a valid git repo with --is-inside-work-tree
             try {
                 launchCommand("rev-parse", "--is-inside-work-tree");
+            } catch (Exception ex) {
+                ex.printStackTrace(listener.error("Workspace has a .git repository, but it appears to be corrupt."));
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if this workspace has a git repository.
+     * If checkParentDirectories is true, searches parent directories.
+     * If checkParentDirectories is false, checks workspace directory only.
+     *
+     * @param checkParentDirectories if true, search upward for a git repository
+     * @return true if this workspace has a git repository
+     * @throws hudson.plugins.git.GitException if underlying git operation fails.
+     * @throws java.lang.InterruptedException if interrupted.
+     */
+    @Override
+    public boolean hasGitRepo(boolean checkParentDirectories) throws GitException, InterruptedException {
+        if (checkParentDirectories) {
+            return hasGitRepo();
+        }
+        if (hasGitRepo(".git")) {
+            // Check if this is a valid git repo with --resolve-git-dir
+            try {
+                launchCommand("rev-parse", "--resolve-git-dir",
+                        workspace.getAbsolutePath() + File.separator + ".git");
             } catch (Exception ex) {
                 ex.printStackTrace(listener.error("Workspace has a .git repository, but it appears to be corrupt."));
                 return false;
@@ -2113,6 +2141,162 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
         }
     }
 
+    @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME",
+        justification = "Path operations below intentionally use absolute '/usr/bin/chcon' and '/sys/fs/selinux/enforce' and '/proc/self/attr/current' at this time (as delivered in relevant popular Linux distros)"
+        )
+    private Boolean fixSELinuxLabel(File key, String label) {
+        // returning false means chcon was tried and failed,
+        // maybe caller needs to retry with other logic
+        // true means all ok, including nothing needs to be done
+        if (!launcher.isUnix()) return true;
+
+        // JENKINS-64913: SELinux Enforced mode forbids SSH client to read
+        // "untrusted" key files.
+        // Check that tools exist and then if SELinux subsystem is activated
+        // Otherwise calling the tools just pollutes build log with errors
+        if (Files.isExecutable(Paths.get("/usr/bin/chcon"))) {
+            // SELinux may actually forbid us to read system paths, so
+            // there are a couple of ways to try checking if it is enabled
+            // (whether this run needs to worry about security labels) and
+            // we genuinely do not care if we failed to probe those points
+
+            // Keep track which "clues" indicate that SELinux currently is
+            // a force that should be reckoned with, on this host now:
+            Boolean clue_proc = false;
+            Boolean clue_sysfs = false;
+            //Boolean clue_ls = false;
+
+            try {
+                // A process should always have rights to inspect itself, but
+                // on some systems even this read returns "Invalid argument"
+                if (Files.isRegularFile(Paths.get("/proc/self/attr/current"))) {
+                    BufferedReader br = Files.newBufferedReader(
+                        Paths.get("/proc/self/attr/current"),
+                        Charset.forName("UTF-8"));
+                    String s;
+                    try {
+                        s = br.readLine();
+                    } catch (Throwable t) {
+                        br.close();
+                        throw t;
+                    }
+                    br.close();
+                    if ("unconfined".equals(s)) {
+                        return true;
+                    }
+                    if ("kernel".equals(s)) {
+                        return true;
+                    }
+                    if (s.contains(":")) {
+                        // Note that SELinux may be enabled but not enforcing,
+                        // if we can check for that - we bail below
+                        clue_proc = true;
+                    }
+                }
+            } catch (SecurityException e) {
+            } catch (FileNotFoundException e) {
+            } catch (IOException e) {
+            }
+
+            try {
+                if (!Files.isDirectory(Paths.get("/sys/fs/selinux"))) {
+                    // Assuming that lack of rights to read this is an
+                    // exception caught below, not a false return here?
+                    return true;
+                }
+
+                if (Files.isRegularFile(Paths.get("/sys/fs/selinux/enforce"))) {
+                    BufferedReader br = Files.newBufferedReader(
+                        Paths.get("/sys/fs/selinux/enforce"),
+                        Charset.forName("UTF-8"));
+                    String s;
+                    try {
+                        s = br.readLine();
+                    } catch (Throwable t) {
+                        br.close();
+                        throw t;
+                    }
+                    br.close();
+                    if ("0".equals(s)) {
+                        // Subsystem exists, but told to not get into way at the moment
+                        return true;
+                    }
+                    if ("1".equals(s)) {
+                        clue_sysfs = true;
+                    }
+                }
+            } catch (SecurityException e) {
+            } catch (FileNotFoundException e) {
+            } catch (IOException e) {
+            }
+
+            // If we are here, there were no clear clues about SELinux *not*
+            // being a possible problem for the current run. We might want
+            // to check `ls -Z` output for success (flag known) and for the
+            // label data in it: using a filesystem without labels (applied
+            // or supported) would get complaints from 'chcon' trying to fix
+            // just a component of the label below. Unfortunately, different
+            // toolkits (GNU/busybox/...) and OSes vary in outputs of that.
+
+            // Here we assume a SELinux capable system if the tool exists,
+            // and no clear indications were seen that the security subsystem
+            // is currently disarmed, so label the key file for SSH to use.
+            // (Can complain if it is unlabeled.)
+            // TOTHINK: Should this be further riddled with sanity checks
+            // (uname, PATH leading to "chcon", etc)?
+
+            if (clue_proc) {
+                listener.getLogger().println("[INFO] Currently running in a labeled security context");
+            }
+
+            if (clue_sysfs) {
+                listener.getLogger().println("[INFO] Currently SELinux is 'enforcing' on the host");
+            }
+
+            if (!clue_sysfs && !clue_proc) { // && !clue_ls
+                listener.getLogger().println("[INFO] SELinux is present on the host " +
+                    "and we could not confirm that it does not apply actively: " +
+                    "will try to relabel temporary files now; this may complain " +
+                    "if context labeling not applicable after all");
+            }
+
+            ArgumentListBuilder args = new ArgumentListBuilder();
+            args.add("/usr/bin/chcon");
+            args.add("--type=" + label);
+            args.add(key.getPath());
+            Launcher.ProcStarter p = launcher.launch().cmds(args.toCommandArray());
+            int status = -1;
+            String stdout = "";
+            String stderr = "";
+            String command = gitExe + " " + StringUtils.join(args.toCommandArray(), " ");
+
+            try {
+                // JENKINS-13356: capture stdout and stderr separately
+                ByteArrayOutputStream stdoutStream = new ByteArrayOutputStream();
+                ByteArrayOutputStream stderrStream = new ByteArrayOutputStream();
+
+                p.stdout(stdoutStream).stderr(stderrStream);
+                listener.getLogger().println(" > " + command);
+                // Should be much faster than 1 min :)
+                status = p.start().joinWithTimeout(1, TimeUnit.MINUTES, listener);
+
+                stdout = stdoutStream.toString(encoding);
+                stderr = stderrStream.toString(encoding);
+            } catch (Throwable e) {
+                listener.getLogger().println("Error performing chcon helper command for SELinux: " + command + " :\n" + e.toString());
+                if (status <= 0) { status = 126; } // cause the message and false return below
+            }
+            if (status > 0) {
+                listener.getLogger().println("[WARNING] Failed (" + status + ") performing chcon helper command for SELinux: " + command + ":\n" +
+                    (stdout.equals("") ? "" : ( "=== STDOUT:\n" + stdout + "\n====\n" )) +
+                    (stderr.equals("") ? "" : ( "=== STDERR:\n" + stderr + "\n====\n" )) +
+                    "IMPACT: if SELinux is enabled, access to temporary key file may be denied for git+ssh below");
+                return false;
+            }
+        }
+        return true;
+    }
+
     private File createSshKeyFile(SSHUserPrivateKey sshUser) throws IOException, InterruptedException {
         File key = createTempFile("ssh", ".key");
         try (PrintWriter w = new PrintWriter(key, encoding)) {
@@ -2123,6 +2307,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
         }
         if (launcher.isUnix()) {
             new FilePath(key).chmod(0400);
+            fixSELinuxLabel(key, "ssh_home_t");
         } else {
             fixSshKeyOnWindows(key);
         }
@@ -2190,6 +2375,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             w.println("cat " + unixArgEncodeFileName(passphrase.getAbsolutePath()));
         }
         ssh.setExecutable(true, true);
+        // fixSELinuxLabel(ssh, "ssh_exec_t");
         return ssh;
     }
 
@@ -2214,6 +2400,7 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
             w.println("esac");
         }
         askpass.setExecutable(true, true);
+        // fixSELinuxLabel(askpass, "ssh_exec_t");
         return askpass;
     }
 
@@ -2404,10 +2591,12 @@ public class CliGitAPIImpl extends LegacyCompatibleGitAPIImpl {
         String fromLocation = ssh.toString();
         String toLocation = ssh_copy.toString();
         //Copying ssh file
+        // fixSELinuxLabel(ssh, "ssh_exec_t");
         try {
             new ProcessBuilder("cp", fromLocation, toLocation).start().waitFor();
             isCopied = true;
             ssh_copy.setExecutable(true,true);
+            // fixSELinuxLabel(ssh_copy, "ssh_exec_t");
             //Deleting original file
             deleteTempFile(ssh);
         }
