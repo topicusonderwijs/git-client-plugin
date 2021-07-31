@@ -5,13 +5,13 @@
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>4.19</version>
+    <version>4.21</version>
     <relativePath />
   </parent>
 
   <groupId>org.jenkins-ci.plugins</groupId>
   <artifactId>git-client</artifactId>
-  <version>3.7.2-topicus1</version>
+  <version>3.9.0-topicus1</version>
   <packaging>hpi</packaging>
 
   <name>Jenkins Git client plugin</name>
@@ -56,17 +56,17 @@
     <connection>scm:git:git://github.com/jenkinsci/${project.artifactId}-plugin.git</connection>
     <developerConnection>scm:git:git@github.com:jenkinsci/${project.artifactId}-plugin.git</developerConnection>
     <url>https://github.com/jenkinsci/${project.artifactId}-plugin</url>
-    <tag>git-client-3.7.2</tag>
+    <tag>git-client-3.9.0</tag>
   </scm>
 
   <properties>
-    <revision>3.7.2</revision>
+    <revision>3.9.0</revision>
     <changelist>-SNAPSHOT</changelist>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <argLine>-Dfile.encoding=${project.build.sourceEncoding}</argLine>
     <jenkins.version>2.263.1</jenkins.version>
     <java.level>8</java.level>
-    <jgit.version>5.11.1.202105131744-r</jgit.version>
+    <jgit.version>5.12.0.202106070339-r</jgit.version>
     <spotbugs.effort>Max</spotbugs.effort>
     <spotbugs.failOnError>true</spotbugs.failOnError>
     <spotbugs.threshold>Medium</spotbugs.threshold>
@@ -77,27 +77,9 @@
       <dependency>
         <groupId>io.jenkins.tools.bom</groupId>
         <artifactId>bom-2.263.x</artifactId>
-        <version>831.v9814430e6383</version>
+        <version>887.vae9c8ac09ff7</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-      <dependency><!-- If caffeine is needed, use version 2.9.1.
-                       Resolves an upper bounds dependency message.
-                       Does not include caffeine in the hpi file. -->
-        <groupId>com.github.ben-manes.caffeine</groupId>
-        <artifactId>caffeine</artifactId>
-        <version>2.9.1</version>
-        <exclusions>
-          <!--  do not bring in the annotations -->
-          <exclusion>
-            <groupId>org.checkerframework</groupId>
-            <artifactId>checker-qual</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.google.errorprone</groupId>
-            <artifactId>error_prone_annotations</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -247,7 +229,7 @@
     <dependency>
       <groupId>nl.jqno.equalsverifier</groupId>
       <artifactId>equalsverifier</artifactId>
-      <version>3.6.1</version>
+      <version>3.7</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -287,7 +269,7 @@
     <dependency>
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs-annotations</artifactId>
-      <version>4.2.3</version>
+      <version>4.3.0</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.code.findbugs</groupId>
@@ -359,7 +341,7 @@
           <dependency>
             <groupId>com.github.spotbugs</groupId>
             <artifactId>spotbugs</artifactId>
-            <version>4.2.3</version>
+            <version>4.3.0</version>
           </dependency>
         </dependencies>
       </plugin>
