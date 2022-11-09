@@ -12,7 +12,6 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.RefSpec;
-import org.eclipse.jgit.transport.URIish;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -29,10 +28,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.MatcherAssert.*;
@@ -171,7 +168,7 @@ public class GitClientCloneTest {
         assertBranchesExist(testGitClient.getBranches(), "master");
         assertAlternatesFileNotFound();
         /* JGit does not support shallow clone */
-        boolean hasShallowCloneSupport = testGitClient instanceof CliGitAPIImpl && workspace.cgit().isAtLeastVersion(1, 5, 0, 0);
+        boolean hasShallowCloneSupport = testGitClient instanceof CliGitAPIImpl;
         assertThat("isShallow?", workspace.cgit().isShallowRepository(), is(hasShallowCloneSupport));
         String shallow = ".git" + File.separator + "shallow";
         if (hasShallowCloneSupport) {
@@ -189,7 +186,7 @@ public class GitClientCloneTest {
         assertBranchesExist(testGitClient.getBranches(), "master");
         assertAlternatesFileNotFound();
         /* JGit does not support shallow clone */
-        boolean hasShallowCloneSupport = testGitClient instanceof CliGitAPIImpl && workspace.cgit().isAtLeastVersion(1, 5, 0, 0);
+        boolean hasShallowCloneSupport = testGitClient instanceof CliGitAPIImpl;
         assertThat("isShallow?", workspace.cgit().isShallowRepository(), is(hasShallowCloneSupport));
         String shallow = ".git" + File.separator + "shallow";
         if (hasShallowCloneSupport) {

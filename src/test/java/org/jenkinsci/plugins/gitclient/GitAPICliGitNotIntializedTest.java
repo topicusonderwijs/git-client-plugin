@@ -16,10 +16,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.empty;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -40,12 +36,11 @@ import java.util.logging.Logger;
  */
 
 @RunWith(Parameterized.class)
-public class GitAPITestCliGitNotIntialized {
+public class GitAPICliGitNotIntializedTest {
     @Rule
     public GitClientSampleRepoRule repo = new GitClientSampleRepoRule();
 
     private int logCount = 0;
-    private final Random random = new Random();
     private static final String LOGGING_STARTED = "Logging started";
     private LogHandler handler = null;
     private TaskListener listener;
@@ -55,9 +50,8 @@ public class GitAPITestCliGitNotIntialized {
 
     private GitClient testGitClient;
     private File testGitDir;
-    private CliGitCommand cliGitCommand;
 
-    public GitAPITestCliGitNotIntialized(final String gitImplName) {
+    public GitAPICliGitNotIntializedTest(final String gitImplName) {
         this.gitImplName = gitImplName;
     }
 
@@ -102,7 +96,6 @@ public class GitAPITestCliGitNotIntialized {
 
         testGitClient = workspace.getGitClient();
         testGitDir = workspace.getGitFileDir();
-        cliGitCommand = workspace.getCliGitCommand();
     }
 
     @After

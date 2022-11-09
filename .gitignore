@@ -13,6 +13,9 @@ work/
 .classpath
 .settings/
 
+# Java microbenchmark harness results file
+/jmh-report.json
+
 /nb-configuration.xml
 
 # Vim
@@ -22,9 +25,10 @@ Session.vim
 # Exhuberant ctags
 tags
 
-# emacs backup files
+# emacs files
 *~
 /nbproject/
+/TAGS
 
 # Mac OSX
 .DS_Store
