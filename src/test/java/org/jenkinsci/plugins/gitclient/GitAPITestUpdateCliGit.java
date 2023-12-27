@@ -1,18 +1,19 @@
 package org.jenkinsci.plugins.gitclient;
 
-import hudson.plugins.git.GitException;
-import org.junit.Test;
-import org.jvnet.hudson.test.Issue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
+import hudson.plugins.git.GitException;
 import java.io.File;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.UUID;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.junit.Assert.*;
+import org.junit.Test;
+import org.jvnet.hudson.test.Issue;
 
 public abstract class GitAPITestUpdateCliGit extends GitAPITestUpdate {
 
@@ -21,7 +22,11 @@ public abstract class GitAPITestUpdateCliGit extends GitAPITestUpdate {
     public void testSubmoduleUpdate() throws Exception {
         w.init();
         w.git.clone_().url(localMirror()).repositoryName("sub2_origin").execute();
-        w.git.checkout().branch("tests/getSubmodules").ref("sub2_origin/tests/getSubmodules").deleteBranchIfExist(true).execute();
+        w.git.checkout()
+                .branch("tests/getSubmodules")
+                .ref("sub2_origin/tests/getSubmodules")
+                .deleteBranchIfExist(true)
+                .execute();
         w.git.submoduleInit();
         w.git.submoduleUpdate().execute();
 
@@ -65,7 +70,11 @@ public abstract class GitAPITestUpdateCliGit extends GitAPITestUpdate {
     public void testSubmoduleUpdateWithThreads() throws Exception {
         w.init();
         w.git.clone_().url(localMirror()).repositoryName("sub2_origin").execute();
-        w.git.checkout().branch("tests/getSubmodules").ref("sub2_origin/tests/getSubmodules").deleteBranchIfExist(true).execute();
+        w.git.checkout()
+                .branch("tests/getSubmodules")
+                .ref("sub2_origin/tests/getSubmodules")
+                .deleteBranchIfExist(true)
+                .execute();
         w.git.submoduleInit();
         w.git.submoduleUpdate().threads(3).execute();
 
@@ -128,17 +137,29 @@ public abstract class GitAPITestUpdateCliGit extends GitAPITestUpdate {
 
         // Switch to branch1
         submoduleUpdateTimeout = 1 + random.nextInt(60 * 24);
-        w.git.submoduleUpdate().remoteTracking(true).useBranch(submodDir, "branch1").timeout(submoduleUpdateTimeout).execute();
+        w.git.submoduleUpdate()
+                .remoteTracking(true)
+                .useBranch(submodDir, "branch1")
+                .timeout(submoduleUpdateTimeout)
+                .execute();
         assertTrue("file2 does not exist and should because on branch1", w.exists(subFile2));
         assertFalse("file3 exists and should not because not on 'branch2'", w.exists(subFile3));
 
         // Switch to branch2
-        w.git.submoduleUpdate().remoteTracking(true).useBranch(submodDir, "branch2").timeout(submoduleUpdateTimeout).execute();
+        w.git.submoduleUpdate()
+                .remoteTracking(true)
+                .useBranch(submodDir, "branch2")
+                .timeout(submoduleUpdateTimeout)
+                .execute();
         assertFalse("file2 exists and should not because not on 'branch1'", w.exists(subFile2));
         assertTrue("file3 does not exist and should because on branch2", w.exists(subFile3));
 
         // Switch to default branch
-        w.git.submoduleUpdate().remoteTracking(true).useBranch(submodDir, defaultBranchName).timeout(submoduleUpdateTimeout).execute();
+        w.git.submoduleUpdate()
+                .remoteTracking(true)
+                .useBranch(submodDir, defaultBranchName)
+                .timeout(submoduleUpdateTimeout)
+                .execute();
         assertFalse("file2 exists and should not because not on 'branch1'", w.exists(subFile2));
         assertFalse("file3 exists and should not because not on 'branch2'", w.exists(subFile3));
     }
@@ -169,7 +190,9 @@ public abstract class GitAPITestUpdateCliGit extends GitAPITestUpdate {
         // Make sure that the new file doesn't exist in the repo with remoteTracking
         String subFile = subModDir + File.separator + "file2";
         w.git.submoduleUpdate().recursive(true).remoteTracking(false).execute();
-        assertFalse("file2 exists and should not because we didn't update to the tip of the default branch.", w.exists(subFile));
+        assertFalse(
+                "file2 exists and should not because we didn't update to the tip of the default branch.",
+                w.exists(subFile));
 
         // Windows tests fail if repoPath is more than 200 characters
         // CLI git support for longpaths on Windows is complicated
@@ -179,7 +202,9 @@ public abstract class GitAPITestUpdateCliGit extends GitAPITestUpdate {
 
         // Run submodule update with remote tracking
         w.git.submoduleUpdate().recursive(true).remoteTracking(true).execute();
-        assertTrue("file2 does not exist and should because we updated to the tip of the default branch.", w.exists(subFile));
+        assertTrue(
+                "file2 does not exist and should because we updated to the tip of the default branch.",
+                w.exists(subFile));
         assertFixSubmoduleUrlsThrows();
     }
 
@@ -189,7 +214,12 @@ public abstract class GitAPITestUpdateCliGit extends GitAPITestUpdate {
         w = clone(localMirror());
 
         checkoutTimeout = 1 + random.nextInt(60 * 24);
-        w.git.checkout().branch(DEFAULT_MIRROR_BRANCH_NAME).ref("origin/" + DEFAULT_MIRROR_BRANCH_NAME).timeout(checkoutTimeout).deleteBranchIfExist(true).execute();
+        w.git.checkout()
+                .branch(DEFAULT_MIRROR_BRANCH_NAME)
+                .ref("origin/" + DEFAULT_MIRROR_BRANCH_NAME)
+                .timeout(checkoutTimeout)
+                .deleteBranchIfExist(true)
+                .execute();
     }
 
     @Test
@@ -213,27 +243,65 @@ public abstract class GitAPITestUpdateCliGit extends GitAPITestUpdate {
         workingArea.git.clone_().url(w.repoPath()).execute();
 
         checkoutTimeout = 1 + random.nextInt(60 * 24);
-        workingArea.git.checkout().ref(defaultRemoteBranchName).branch(defaultBranchName).deleteBranchIfExist(true).sparseCheckoutPaths(Collections.singletonList("dir1")).timeout(checkoutTimeout).execute();
+        workingArea
+                .git
+                .checkout()
+                .ref(defaultRemoteBranchName)
+                .branch(defaultBranchName)
+                .deleteBranchIfExist(true)
+                .sparseCheckoutPaths(Collections.singletonList("dir1"))
+                .timeout(checkoutTimeout)
+                .execute();
         assertTrue(workingArea.exists("dir1"));
         assertFalse(workingArea.exists("dir2"));
         assertFalse(workingArea.exists("dir3"));
 
-        workingArea.git.checkout().ref(defaultRemoteBranchName).branch(defaultBranchName).deleteBranchIfExist(true).sparseCheckoutPaths(Collections.singletonList("dir2")).timeout(checkoutTimeout).execute();
+        workingArea
+                .git
+                .checkout()
+                .ref(defaultRemoteBranchName)
+                .branch(defaultBranchName)
+                .deleteBranchIfExist(true)
+                .sparseCheckoutPaths(Collections.singletonList("dir2"))
+                .timeout(checkoutTimeout)
+                .execute();
         assertFalse(workingArea.exists("dir1"));
         assertTrue(workingArea.exists("dir2"));
         assertFalse(workingArea.exists("dir3"));
 
-        workingArea.git.checkout().ref(defaultRemoteBranchName).branch(defaultBranchName).deleteBranchIfExist(true).sparseCheckoutPaths(Arrays.asList("dir1", "dir2")).timeout(checkoutTimeout).execute();
+        workingArea
+                .git
+                .checkout()
+                .ref(defaultRemoteBranchName)
+                .branch(defaultBranchName)
+                .deleteBranchIfExist(true)
+                .sparseCheckoutPaths(Arrays.asList("dir1", "dir2"))
+                .timeout(checkoutTimeout)
+                .execute();
         assertTrue(workingArea.exists("dir1"));
         assertTrue(workingArea.exists("dir2"));
         assertFalse(workingArea.exists("dir3"));
 
-        workingArea.git.checkout().ref(defaultRemoteBranchName).branch(defaultBranchName).deleteBranchIfExist(true).sparseCheckoutPaths(Collections.emptyList()).timeout(checkoutTimeout).execute();
+        workingArea
+                .git
+                .checkout()
+                .ref(defaultRemoteBranchName)
+                .branch(defaultBranchName)
+                .deleteBranchIfExist(true)
+                .sparseCheckoutPaths(Collections.emptyList())
+                .timeout(checkoutTimeout)
+                .execute();
         assertTrue(workingArea.exists("dir1"));
         assertTrue(workingArea.exists("dir2"));
         assertTrue(workingArea.exists("dir3"));
 
-        workingArea.git.checkout().ref(defaultRemoteBranchName).branch(defaultBranchName).deleteBranchIfExist(true).sparseCheckoutPaths(null)
+        workingArea
+                .git
+                .checkout()
+                .ref(defaultRemoteBranchName)
+                .branch(defaultBranchName)
+                .deleteBranchIfExist(true)
+                .sparseCheckoutPaths(null)
                 .timeout(checkoutTimeout)
                 .execute();
         assertTrue(workingArea.exists("dir1"));

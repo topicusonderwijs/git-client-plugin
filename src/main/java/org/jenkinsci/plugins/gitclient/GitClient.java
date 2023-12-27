@@ -6,24 +6,23 @@ import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.common.StandardCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
+import edu.umd.cs.findbugs.annotations.CheckForNull;
 import hudson.FilePath;
 import hudson.ProxyConfiguration;
 import hudson.model.TaskListener;
 import hudson.plugins.git.*;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.RefSpec;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
-
-import edu.umd.cs.findbugs.annotations.CheckForNull;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Writer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 
 /**
  * Interface to Git functionality.
@@ -48,8 +47,7 @@ public interface GitClient {
      */
     CredentialsMatcher CREDENTIALS_MATCHER = CredentialsMatchers.anyOf(
             CredentialsMatchers.instanceOf(StandardUsernamePasswordCredentials.class),
-            CredentialsMatchers.instanceOf(SSHUserPrivateKey.class)
-    );
+            CredentialsMatchers.instanceOf(SSHUserPrivateKey.class));
 
     /**
      * Remove all credentials from the client.
@@ -308,7 +306,6 @@ public interface GitClient {
      */
     void checkoutBranch(@CheckForNull String branch, String ref) throws GitException, InterruptedException;
 
-
     /**
      * Clone a remote repository
      *
@@ -319,7 +316,8 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException if interrupted.
      */
-    void clone(String url, String origin, boolean useShallowClone, String reference) throws GitException, InterruptedException;
+    void clone(String url, String origin, boolean useShallowClone, String reference)
+            throws GitException, InterruptedException;
 
     /**
      * Returns a {@link org.jenkinsci.plugins.gitclient.CloneCommand} to build up the git-log invocation.
@@ -402,7 +400,6 @@ public interface GitClient {
      * @return a {@link org.jenkinsci.plugins.gitclient.PushCommand} object.
      */
     PushCommand push();
-
 
     /**
      * merge.
@@ -513,7 +510,6 @@ public interface GitClient {
      */
     Set<Branch> getRemoteBranches() throws GitException, InterruptedException;
 
-
     // --- manage tags
 
     /**
@@ -573,7 +569,6 @@ public interface GitClient {
      * @throws java.lang.InterruptedException if interrupted.
      */
     Set<String> getRemoteTagNames(String tagPattern) throws GitException, InterruptedException;
-
 
     // --- manage refs
 
@@ -655,7 +650,8 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException if interrupted.
      */
-    Map<String, ObjectId> getRemoteReferences(String remoteRepoUrl, String pattern, boolean headsOnly, boolean tagsOnly) throws GitException, InterruptedException;
+    Map<String, ObjectId> getRemoteReferences(String remoteRepoUrl, String pattern, boolean headsOnly, boolean tagsOnly)
+            throws GitException, InterruptedException;
 
     /**
      * List symbolic references in a remote repository. Equivalent to <code>git ls-remote --symref &lt;repository&gt;
@@ -669,7 +665,8 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException  if interrupted.
      */
-    Map<String, String> getRemoteSymbolicReferences(String remoteRepoUrl, String pattern) throws GitException, InterruptedException;
+    Map<String, String> getRemoteSymbolicReferences(String remoteRepoUrl, String pattern)
+            throws GitException, InterruptedException;
 
     /**
      * Retrieve commit object that is direct child for <code>revName</code> revision reference.
@@ -707,7 +704,6 @@ public interface GitClient {
      */
     List<ObjectId> revList(String ref) throws GitException, InterruptedException;
 
-
     // --- submodules
 
     /**
@@ -735,7 +731,7 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException if interrupted.
      */
-    List<IndexEntry> getSubmodules( String treeIsh ) throws GitException, InterruptedException;
+    List<IndexEntry> getSubmodules(String treeIsh) throws GitException, InterruptedException;
 
     /**
      * Create a submodule in subdir child directory for remote repository
@@ -757,7 +753,7 @@ public interface GitClient {
      * @throws java.lang.InterruptedException if interrupted.
      */
     @Deprecated
-    void submoduleUpdate(boolean recursive)  throws GitException, InterruptedException;
+    void submoduleUpdate(boolean recursive) throws GitException, InterruptedException;
 
     /**
      * Run submodule update optionally recursively on all submodules, with a specific
@@ -784,7 +780,7 @@ public interface GitClient {
      * @throws java.lang.InterruptedException if interrupted.
      */
     @Deprecated
-    void submoduleUpdate(boolean recursive, boolean remoteTracking)  throws GitException, InterruptedException;
+    void submoduleUpdate(boolean recursive, boolean remoteTracking) throws GitException, InterruptedException;
     /**
      * Run submodule update optionally recursively on all submodules, optionally with remoteTracking, with a specific
      * reference passed to git clone if needing to --init.
@@ -798,7 +794,8 @@ public interface GitClient {
      * @throws java.lang.InterruptedException if interrupted.
      */
     @Deprecated
-    void submoduleUpdate(boolean recursive, boolean remoteTracking, String reference)  throws GitException, InterruptedException;
+    void submoduleUpdate(boolean recursive, boolean remoteTracking, String reference)
+            throws GitException, InterruptedException;
 
     /**
      * submoduleUpdate.
@@ -814,7 +811,7 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException if interrupted.
      */
-    void submoduleClean(boolean recursive)  throws GitException, InterruptedException;
+    void submoduleClean(boolean recursive) throws GitException, InterruptedException;
 
     /**
      * submoduleInit.
@@ -822,7 +819,7 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException if interrupted.
      */
-    void submoduleInit()  throws GitException, InterruptedException;
+    void submoduleInit() throws GitException, InterruptedException;
 
     /**
      * Set up submodule URLs so that they correspond to the remote pertaining to
@@ -833,8 +830,7 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException if interrupted.
      */
-    void setupSubmoduleUrls( Revision rev, TaskListener listener ) throws GitException, InterruptedException;
-
+    void setupSubmoduleUrls(Revision rev, TaskListener listener) throws GitException, InterruptedException;
 
     // --- commit log and notes
 
@@ -883,7 +879,7 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException if interrupted.
      */
-    void appendNote(String note, String namespace ) throws GitException, InterruptedException;
+    void appendNote(String note, String namespace) throws GitException, InterruptedException;
 
     /**
      * Adds a new git-note on the current HEAD commit.
@@ -895,7 +891,7 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException if interrupted.
      */
-    void addNote(String note, String namespace ) throws GitException, InterruptedException;
+    void addNote(String note, String namespace) throws GitException, InterruptedException;
 
     /**
      * Given a Revision, show it as if it were an entry from git whatchanged, so that it
@@ -959,8 +955,8 @@ public interface GitClient {
      * @throws hudson.plugins.git.GitException if underlying git operation fails.
      * @throws java.lang.InterruptedException if interrupted.
      */
-    List<String> showRevision(ObjectId from, ObjectId to, Boolean useRawOutput) throws GitException, InterruptedException;
-
+    List<String> showRevision(ObjectId from, ObjectId to, Boolean useRawOutput)
+            throws GitException, InterruptedException;
 
     /**
      * Equivalent of "git-describe --tags".
