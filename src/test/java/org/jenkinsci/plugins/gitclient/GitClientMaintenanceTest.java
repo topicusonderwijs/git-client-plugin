@@ -165,8 +165,10 @@ public class GitClientMaintenanceTest {
         collector.checkThat("Missing " + gitDir, gitDir, is(anExistingDirectory()));
         gitClient.setRemoteUrl("origin", srcRepoDir.getAbsolutePath());
         CliGitCommand gitCmd = new CliGitCommand(gitClient);
-        gitCmd.run("config", "user.name", "Vojtěch GitClientMaintenanceTest Zweibrücken-Šafařík");
-        gitCmd.run("config", "user.email", "email.from.git.client.maintenance@example.com");
+        gitCmd.initializeRepository(
+                "Vojtěch GitClientMaintenanceTest Zweibrücken-Šafařík",
+                "email.from.git.client.maintenance@example.com");
+
         if (gitClient instanceof CliGitAPIImpl) {
             CliGitAPIImpl cliGitClient = (CliGitAPIImpl) gitClient;
             if (!cliGitClient.isAtLeastVersion(1, 8, 0, 0)) {
@@ -303,7 +305,7 @@ public class GitClientMaintenanceTest {
         // Run incremental repack maintenance task
         // Need to create pack files to use incremental repack
         collector.checkThat(
-                gitClient.maintenance("gc"), is(!gitImplName.startsWith("jgit"))); // No gc on JGit maintenace
+                gitClient.maintenance("gc"), is(!gitImplName.startsWith("jgit"))); // No gc on JGit maintenance
 
         collector.checkThat(gitClient.maintenance(maintenanceTask), is(incrementalRepackSupported));
 

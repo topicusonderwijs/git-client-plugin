@@ -55,6 +55,8 @@ public class JGitLightweightTagTest {
                 .getClient();
         repoRootGitDir = gitClient.withRepository((r, channel) -> r.getDirectory());
         gitClient.init_().workspace(repoRoot.getAbsolutePath()).execute();
+        CliGitCommand gitCmd = new CliGitCommand(gitClient);
+        gitCmd.initializeRepository();
         assertThat(repoRootGitDir, is(anExistingDirectory()));
     }
 

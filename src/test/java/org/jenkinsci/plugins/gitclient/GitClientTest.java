@@ -266,6 +266,28 @@ public class GitClientTest {
         assertTrue("Failed to delete temporary readGitConfig directory", configDir.delete());
     }
 
+    @BeforeClass
+    public static void addLocalGitConfigChanges() throws Exception {
+        File currentDir = new File(".");
+        CliGitAPIImpl currentDirCliGit = (CliGitAPIImpl) Git.with(TaskListener.NULL, new EnvVars())
+                .in(currentDir)
+                .using("git")
+                .getClient();
+        CliGitCommand gitCmd = new CliGitCommand(currentDirCliGit);
+        gitCmd.initializeRepository();
+    }
+
+    @AfterClass
+    public static void removeLocalGitConfigChanges() throws Exception {
+        File currentDir = new File(".");
+        CliGitAPIImpl currentDirCliGit = (CliGitAPIImpl) Git.with(TaskListener.NULL, new EnvVars())
+                .in(currentDir)
+                .using("git")
+                .getClient();
+        CliGitCommand gitCmd = new CliGitCommand(currentDirCliGit);
+        gitCmd.removeRepositorySettings();
+    }
+
     @AfterClass
     public static void removeMirrorAndSrcRepos() throws Exception {
         try {
@@ -288,8 +310,7 @@ public class GitClientTest {
         assertTrue("Missing " + gitDir, gitDir.isDirectory());
         gitClient.setRemoteUrl("origin", srcRepoDir.getAbsolutePath());
         CliGitCommand gitCmd = new CliGitCommand(gitClient);
-        gitCmd.run("config", "user.name", "Vojtěch GitClientTest Zweibrücken-Šafařík");
-        gitCmd.run("config", "user.email", "email.from.git.client@example.com");
+        gitCmd.initializeRepository("Vojtěch GitClientTest Zweibrücken-Šafařík", "email.from.git.client@example.com");
     }
 
     /**
@@ -1017,8 +1038,7 @@ public class GitClientTest {
                 .getClient();
         gitClientTemp.init();
         CliGitCommand gitCmd = new CliGitCommand(gitClientTemp);
-        gitCmd.run("config", "user.name", "Vojtěch GitClientTest Zweibrücken-Šafařík");
-        gitCmd.run("config", "user.email", "email.from.git.client@example.com");
+        gitCmd.initializeRepository("Vojtěch GitClientTest Zweibrücken-Šafařík", "email.from.git.client@example.com");
         FilePath gitClientFilePath = gitClientTemp.getWorkTree();
         FilePath gitClientTempFile = gitClientFilePath.createTextTempFile("aPre", ".txt", "file contents");
         gitClientTemp.add(".");
@@ -1051,7 +1071,7 @@ public class GitClientTest {
     }
 
     /**
-     * Test case for auto local branch creation behviour.
+     * Test case for auto local branch creation behaviour.
      * This is essentially a stripped down version of {@link GitAPITestUpdate#testBranchContainingRemote()}
      * @throws Exception on exceptions occur
      */
@@ -1063,11 +1083,7 @@ public class GitClientTest {
                 .using(gitImplName)
                 .getClient();
         gitClientTemp.init();
-        CliGitCommand gitCmd = new CliGitCommand(gitClientTemp);
-        gitCmd.run("config", "user.name", "Vojtěch GitClientTest temp Zweibrücken-Šafařík");
-        gitCmd.run("config", "user.email", "email.by.client@example.com");
-        FilePath gitClientFilePath = gitClientTemp.getWorkTree();
-        FilePath gitClientTempFile = gitClientFilePath.createTextTempFile("aPre", ".txt", "file contents");
+        FilePath gitClientTempFile = getClientTmpFilePath(gitClientTemp);
         gitClientTemp.add(".");
         gitClientTemp.commit("Added " + gitClientTempFile.toURI().toString());
         gitClient.clone_().url("file://" + repoRootTemp.getPath()).execute();
@@ -1078,6 +1094,13 @@ public class GitClientTest {
 
         Set<String> refNames = gitClient.getRefNames("refs/heads/");
         assertThat(refNames, contains("refs/heads/" + defaultBranchName));
+    }
+
+    private static FilePath getClientTmpFilePath(GitClient gitClientTemp) throws IOException, InterruptedException {
+        CliGitCommand gitCmd = new CliGitCommand(gitClientTemp);
+        gitCmd.initializeRepository("Vojtěch GitClientTest temp Zweibrücken-Šafařík", "email.by.client@example.com");
+        FilePath gitClientFilePath = gitClientTemp.getWorkTree();
+        return gitClientFilePath.createTextTempFile("aPre", ".txt", "file contents");
     }
 
     private void assertFileInWorkingDir(GitClient client, String fileName) {
@@ -2517,7 +2540,7 @@ public class GitClientTest {
         }
 
         /* Assertion is wrong! newDirName should not have contents.
-         * Or rather, I think the code is wrong, newDirName shoud not have contents,
+         * Or rather, I think the code is wrong, newDirName should not have contents,
          * since the branch being checked out does not include newDirName submodule.
          * How many installations depend on that unexpected behavior?
          */
@@ -2555,8 +2578,7 @@ public class GitClientTest {
         urlRepoClient.init();
         allowFileProtocol(urlRepoClient);
         CliGitCommand gitCmd = new CliGitCommand(urlRepoClient);
-        gitCmd.run("config", "user.name", "Vojtěch GitClientTest Zweibrücken-Šafařík");
-        gitCmd.run("config", "user.email", "email.from.git.client@example.com");
+        gitCmd.initializeRepository("Vojtěch GitClientTest Zweibrücken-Šafařík", "email.from.git.client@example.com");
         File readme = new File(urlRepoDir, "readme");
         String readmeText = "This repo includes .url in its directory name (" + random.nextInt() + ")";
         Files.write(Paths.get(readme.getAbsolutePath()), readmeText.getBytes());
@@ -2574,8 +2596,8 @@ public class GitClientTest {
                 .getClient();
         repoHasSubmoduleClient.init();
         gitCmd = new CliGitCommand(repoHasSubmoduleClient);
-        gitCmd.run("config", "user.name", "Vojtěch GitClientTest repo submodule Zweibrücken-Šafařík");
-        gitCmd.run("config", "user.email", "email.from.git.client@example.com");
+        gitCmd.initializeRepository(
+                "Vojtěch GitClientTest repo submodule Zweibrücken-Šafařík", "email.from.git.client@example.com");
         /* Enable long paths to prevent checkout failure on default Windows workspace with MSI installer */
         enableLongPaths(repoHasSubmoduleClient);
         allowFileProtocol(repoHasSubmoduleClient);

@@ -79,8 +79,7 @@ public class LegacyCompatibleGitAPIImplTest {
         assertNotGitRepo(repo);
         git.init();
         CliGitCommand gitCmd = new CliGitCommand(git);
-        gitCmd.run("config", "user.name", "Vojtěch legacy Zweibrücken-Šafařík");
-        gitCmd.run("config", "user.email", "email.from.git.client.test@example.com");
+        gitCmd.initializeRepository("Vojtěch legacy Zweibrücken-Šafařík", "email.from.git.client.test@example.com");
         assertIsGitRepo(repo);
     }
 

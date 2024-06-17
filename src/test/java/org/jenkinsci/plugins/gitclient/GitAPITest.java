@@ -14,6 +14,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.Util;
 import hudson.model.TaskListener;
@@ -42,6 +43,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.util.SystemReader;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -91,6 +93,12 @@ public class GitAPITest {
         this.gitImplName = gitImplName;
     }
 
+    public static EnvVars getConfigNoSystemEnvVars() {
+        EnvVars envVars = new EnvVars();
+        envVars.put("GIT_CONFIG_NOSYSTEM", "1");
+        return envVars;
+    }
+
     @Parameterized.Parameters(name = "{0}")
     public static Collection gitObjects() {
         List<Object[]> arguments = new ArrayList<>();
@@ -104,6 +112,7 @@ public class GitAPITest {
 
     @BeforeClass
     public static void loadLocalMirror() throws Exception {
+        SystemReader.getInstance().getUserConfig().clear();
         /* Prime the local mirror cache before other tests run */
         /* Allow 2-6 second delay before priming the cache */
         /* Allow other tests a better chance to prime the cache */
@@ -126,10 +135,11 @@ public class GitAPITest {
     @BeforeClass
     public static void computeDefaultBranchName() throws Exception {
         File configDir = Files.createTempDirectory("readGitConfig").toFile();
-        CliGitCommand getDefaultBranchNameCmd = new CliGitCommand(Git.with(TaskListener.NULL, new hudson.EnvVars())
-                .in(configDir)
-                .using("git")
-                .getClient());
+        CliGitCommand getDefaultBranchNameCmd =
+                new CliGitCommand(Git.with(TaskListener.NULL, getConfigNoSystemEnvVars())
+                        .in(configDir)
+                        .using("git")
+                        .getClient());
         String[] output = getDefaultBranchNameCmd.runWithoutAssert("config", "--get", "init.defaultBranch");
         for (String s : output) {
             String result = s.trim();
@@ -158,7 +168,7 @@ public class GitAPITest {
         testGitClient = workspace.getGitClient();
         testGitDir = workspace.getGitFileDir();
         cliGitCommand = workspace.getCliGitCommand();
-        initializeWorkspace(workspace);
+        workspace.initializeWorkspace();
     }
 
     @After
@@ -218,7 +228,7 @@ public class GitAPITest {
         workspace.launchCommand("git", "remote", "add", "ndeloof", "git@github.com:ndeloof/git-client-plugin.git");
         String remoteUrl = workspace.getGitClient().getRemoteUrl("origin");
         assertEquals(
-                "unexepected remote URL " + remoteUrl, "https://github.com/jenkinsci/git-client-plugin.git", remoteUrl);
+                "unexpected remote URL " + remoteUrl, "https://github.com/jenkinsci/git-client-plugin.git", remoteUrl);
     }
 
     @Test
@@ -452,13 +462,7 @@ public class GitAPITest {
         File submodule = workspace.file(dirName3);
         assertTrue("Did not create dir " + dirName3, submodule.mkdir());
         WorkspaceWithRepo workspace1 = new WorkspaceWithRepo(submodule, gitImplName, TaskListener.NULL);
-        workspace1.getGitClient().init();
-        final String userName = "root";
-        final String emailAddress = "root@mydomain.com";
-        workspace1.getCliGitCommand().run("config", "user.name", userName);
-        workspace1.getCliGitCommand().run("config", "user.email", emailAddress);
-        workspace1.getGitClient().setAuthor(userName, emailAddress);
-        workspace1.getGitClient().setCommitter(userName, emailAddress);
+        workspace1.initializeWorkspace();
         workspace1.commitEmpty("init");
 
         testGitClient.clean();
@@ -746,7 +750,7 @@ public class GitAPITest {
     @Test
     public void testListRemoteBranches() throws Exception {
         WorkspaceWithRepo remote = new WorkspaceWithRepo(secondRepo.getRoot(), gitImplName, TaskListener.NULL);
-        initializeWorkspace(remote);
+        remote.initializeWorkspace();
         remote.commitEmpty("init");
         remote.getGitClient().branch("test");
         remote.getGitClient().branch("another");
@@ -762,7 +766,7 @@ public class GitAPITest {
     @Test
     public void testRemoteListTagsWithFilter() throws Exception {
         WorkspaceWithRepo remote = new WorkspaceWithRepo(secondRepo.getRoot(), gitImplName, TaskListener.NULL);
-        initializeWorkspace(remote);
+        remote.initializeWorkspace();
         remote.commitEmpty("init");
         remote.tag("test");
         remote.tag("another_test");
@@ -781,7 +785,7 @@ public class GitAPITest {
     @Test
     public void testRemoteListTagsWithoutFilter() throws Exception {
         WorkspaceWithRepo remote = new WorkspaceWithRepo(secondRepo.getRoot(), gitImplName, TaskListener.NULL);
-        initializeWorkspace(remote);
+        remote.initializeWorkspace();
         remote.commitEmpty("init");
         remote.tag("test");
         remote.tag("another_test");
@@ -903,7 +907,7 @@ public class GitAPITest {
 
     @Test
     public void testNotesAppendFirstNote() throws Exception {
-        initializeWorkspace(workspace);
+        workspace.initializeWorkspace();
         workspace.touch(testGitDir, "file1", "");
         testGitClient.add("file1");
         workspace.commitEmpty("init");
@@ -924,7 +928,7 @@ public class GitAPITest {
         teamWorkspace.initBareRepo(teamWorkspace.getGitClient(), true);
 
         WorkspaceWithRepo workspace1 = new WorkspaceWithRepo(thirdRepo.getRoot(), gitImplName, TaskListener.NULL);
-        initializeWorkspace(workspace1);
+        workspace1.initializeWorkspace();
         WorkspaceWithRepo workspace2 = workspace;
 
         workspace1.commitEmpty("c");
@@ -1247,7 +1251,7 @@ public class GitAPITest {
                 .setRevisionToMerge(testGitClient.getHeadRev(testGitDir.getAbsolutePath(), "branch1"))
                 .execute();
 
-        // Compare commit counts of before and after commiting the merge, should be  one due to the squashing of
+        // Compare commit counts of before and after committing the merge, should be  one due to the squashing of
         // commits.
         final int commitCountBefore = testGitClient.revList("HEAD").size();
         testGitClient.commit("commitMerge");
@@ -1274,7 +1278,7 @@ public class GitAPITest {
         testGitClient.commit("commit2");
 
         // Merge branch1 with default branch, without squashing commits.
-        // Compare commit counts of before and after commiting the merge, should be two due to the no squashing of
+        // Compare commit counts of before and after committing the merge, should be two due to the no squashing of
         // commits.
         testGitClient.checkout().ref(defaultBranchName).execute();
         final int commitCountBefore = testGitClient.revList("HEAD").size();
@@ -1524,7 +1528,7 @@ public class GitAPITest {
     public void testCloneNoCheckout() throws Exception {
         // Create a repo for cloning purpose
         WorkspaceWithRepo repoToClone = new WorkspaceWithRepo(secondRepo.getRoot(), gitImplName, TaskListener.NULL);
-        initializeWorkspace(repoToClone);
+        repoToClone.initializeWorkspace();
         repoToClone.commitEmpty("init");
         repoToClone.touch(repoToClone.getGitFileDir(), "file1", "");
         repoToClone.getGitClient().add("file1");
@@ -1687,18 +1691,6 @@ public class GitAPITest {
         changelogCommand.execute();
         assertTrue("No log message in " + writer, writer.toString().contains(logMessage));
         assertTrue("No SHA1 in " + writer, writer.toString().contains(sha1));
-    }
-
-    private void initializeWorkspace(WorkspaceWithRepo initWorkspace) throws Exception {
-        final GitClient initGitClient = initWorkspace.getGitClient();
-        final CliGitCommand initCliGitCommand = initWorkspace.getCliGitCommand();
-        initGitClient.init();
-        final String userName = "root";
-        final String emailAddress = "root@mydomain.com";
-        initCliGitCommand.run("config", "user.name", userName);
-        initCliGitCommand.run("config", "user.email", emailAddress);
-        initGitClient.setAuthor(userName, emailAddress);
-        initGitClient.setCommitter(userName, emailAddress);
     }
 
     /**

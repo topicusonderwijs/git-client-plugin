@@ -123,19 +123,7 @@ public class GitAPIForCliGitTest {
 
         testGitClient = workspace.getGitClient();
         testGitDir = workspace.getGitFileDir();
-        initializeWorkspace(workspace);
-    }
-
-    private void initializeWorkspace(WorkspaceWithRepo initWorkspace) throws Exception {
-        final GitClient initGitClient = initWorkspace.getGitClient();
-        final CliGitCommand initCliGitCommand = initWorkspace.getCliGitCommand();
-        initGitClient.init();
-        final String userName = "root";
-        final String emailAddress = "root@mydomain.com";
-        initCliGitCommand.run("config", "user.name", userName);
-        initCliGitCommand.run("config", "user.email", emailAddress);
-        initGitClient.setAuthor(userName, emailAddress);
-        initGitClient.setCommitter(userName, emailAddress);
+        workspace.initializeWorkspace();
     }
 
     @After
@@ -152,7 +140,7 @@ public class GitAPIForCliGitTest {
     @Test
     public void testPushFromShallowClone() throws Exception {
         WorkspaceWithRepo remote = new WorkspaceWithRepo(secondRepo.getRoot(), gitImplName, TaskListener.NULL);
-        initializeWorkspace(remote);
+        remote.initializeWorkspace();
         remote.commitEmpty("init");
         remote.touch(remote.getGitFileDir(), "file1", "");
         remote.getGitClient().add("file1");

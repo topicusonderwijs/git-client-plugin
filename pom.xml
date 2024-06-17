@@ -5,12 +5,12 @@
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>4.75</version>
+    <version>4.83</version>
     <relativePath />
   </parent>
 
   <artifactId>git-client</artifactId>
-  <version>4.6.0-topicus1</version>
+  <version>5.0.0-topicus1</version>
   <packaging>hpi</packaging>
 
   <name>Jenkins Git client plugin</name>
@@ -53,19 +53,19 @@
   <scm>
     <connection>scm:git:https://github.com/${gitHubRepo}</connection>
     <developerConnection>scm:git:git@github.com:${gitHubRepo}.git</developerConnection>
-    <tag>git-client-4.6.0</tag>
+    <tag>git-client-5.0.0</tag>
     <url>https://github.com/${gitHubRepo}</url>
   </scm>
 
   <properties>
-    <revision>4.6.0</revision>
+    <revision>5.0.0</revision>
     <changelist>-SNAPSHOT</changelist>
     <!-- Character set tests fail unless file.encoding is set -->
     <argLine>-Dfile.encoding=${project.build.sourceEncoding}</argLine>
     <gitHubRepo>jenkinsci/${project.artifactId}-plugin</gitHubRepo>
     <!-- https://www.jenkins.io/doc/developer/plugin-development/choosing-jenkins-baseline/ -->
-    <jenkins.version>2.387.3</jenkins.version>
-    <jgit.version>6.8.0.202311291450-r</jgit.version>
+    <jenkins.version>2.440.3</jenkins.version>
+    <jgit.version>6.10.0.202406032230-r</jgit.version>
     <spotbugs.effort>Max</spotbugs.effort>
     <spotbugs.threshold>Low</spotbugs.threshold>
     <spotless.check.skip>false</spotless.check.skip>
@@ -75,8 +75,8 @@
     <dependencies>
       <dependency>
         <groupId>io.jenkins.tools.bom</groupId>
-        <artifactId>bom-2.387.x</artifactId>
-        <version>2543.vfb_1a_5fb_9496d</version>
+        <artifactId>bom-2.440.x</artifactId>
+        <version>3120.v4d898e1e9fc4</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -87,6 +87,11 @@
       <groupId>io.jenkins</groupId>
       <artifactId>configuration-as-code</artifactId>
       <optional>true</optional>
+    </dependency>
+    <!-- Use gson api plugin rather than JGit LFS transitive dependency inclusion of gson -->
+    <dependency>
+      <groupId>io.jenkins.plugins</groupId>
+      <artifactId>gson-api</artifactId>
     </dependency>
     <dependency>
       <!-- Use mina api common plugin rather than JGit transitive dependency inclusion of Apache Mina sshd common -->
@@ -147,6 +152,12 @@
       <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit.lfs</artifactId>
       <version>${jgit.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.code.gson</groupId>
+          <artifactId>gson</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
@@ -197,14 +208,22 @@
       <artifactId>structs</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.jenkins-ci.plugins</groupId>
-      <artifactId>trilead-api</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.googlecode.json-simple</groupId>
       <artifactId>json-simple</artifactId>
       <version>1.1.1</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.sparsick.testcontainers.gitserver</groupId>
+      <artifactId>testcontainers-gitserver</artifactId>
+      <version>0.8.0</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>ch.qos.logback</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.jenkins.configuration-as-code</groupId>
@@ -219,12 +238,13 @@
     <dependency>
       <groupId>nl.jqno.equalsverifier</groupId>
       <artifactId>equalsverifier</artifactId>
-      <version>3.15.4</version>
+      <version>3.16.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.jenkins-ci.plugins</groupId>
-      <artifactId>git-server</artifactId>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <version>4.2.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -248,7 +268,13 @@
     <dependency>
       <groupId>org.objenesis</groupId>
       <artifactId>objenesis</artifactId>
-      <version>3.3</version>
+      <version>3.4</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+      <version>1.19.8</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -269,6 +295,15 @@
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables>
+            <org.jenkinsci.plugins.gitclient.verifier.SshHostKeyVerificationStrategy.jgit_known_hosts_file>${project.build.directory}/ssh/know_hosts</org.jenkinsci.plugins.gitclient.verifier.SshHostKeyVerificationStrategy.jgit_known_hosts_file>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
